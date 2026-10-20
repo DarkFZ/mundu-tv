@@ -1,5 +1,6 @@
 // Dados públicos do projeto iptv-org (https://github.com/iptv-org/api)
 import { countryName, categoryName } from './labels.js'
+import { EXTRA_CHANNELS } from './extra.js'
 
 const BASE = import.meta.env.VITE_API_BASE || 'https://iptv-org.github.io/api'
 
@@ -52,9 +53,16 @@ export async function loadCatalog() {
     if (better) logoByChannel.set(l.channel, l)
   }
 
-  const list = []
+  const extraIds = new Set(EXTRA_CHANNELS.map((c) => c.id))
+  const list = EXTRA_CHANNELS.map((c) => ({
+    ...c,
+    logo: logoByChannel.get(c.id)?.url || c.logo,
+    streams: [],
+    browserOk: true,
+    featured: true,
+  }))
   for (const c of channels) {
-    if (c.is_nsfw || c.closed || blocked.has(c.id)) continue
+    if (c.is_nsfw || c.closed || blocked.has(c.id) || extraIds.has(c.id)) continue
     const chStreams = streamsByChannel.get(c.id)
     if (!chStreams?.length) continue
     const sorted = [...chStreams].sort((a, b) => streamScore(a) - streamScore(b))
@@ -70,7 +78,8 @@ export async function loadCatalog() {
       browserOk: !IS_HTTPS_PAGE || sorted.some((s) => s.url.startsWith('https:')),
     })
   }
-  list.sort((a, b) => a.name.localeCompare(b.name))
+  // Os diretos oficiais aparecem primeiro; o resto por ordem alfabética
+  list.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || a.name.localeCompare(b.name))
 
   // Só países/categorias que têm canais, com nomes em português
   const countByCountry = new Map()
@@ -95,6 +104,7 @@ export async function loadCatalog() {
 
 // Um único estado por canal, para mostrar na lista
 export function channelStatus(channel) {
+  if (channel.youtube) return null
   if (!channel.browserOk) return { kind: 'neutral', text: 'Só HTTP' }
   const best = playableStreams(channel)[0]
   if (best?.labels?.includes('Geo-blocked')) return { kind: 'warning', text: 'Geo-bloqueado' }

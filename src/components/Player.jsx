@@ -4,6 +4,7 @@ import { Circle, ExternalLink, Loader2, RotateCcw, Square, Star, X } from 'lucid
 import { playableStreams } from '../api.js'
 import { categoryName, labelName } from '../labels.js'
 import { Logo } from './ChannelRow.jsx'
+import { youtubeLiveUrl } from '../extra.js'
 
 const MAX_BYTES = 2 * 1024 ** 3 // pára sozinho aos 2 GB para não esgotar a memória
 
@@ -41,7 +42,76 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
-export default function Player({ channel, countryLabel, onClose, isFav, onToggleFav, onPlaying }) {
+export default function Player(props) {
+  return props.channel.youtube ? <YouTubeStage {...props} /> : <HlsStage {...props} />
+}
+
+// Canais com direto oficial no YouTube: o vídeo vem do leitor do YouTube
+function YouTubeStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlaying }) {
+  useEffect(() => {
+    onPlaying?.(channel.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id])
+
+  const meta = [channel.categories[0] && categoryName(channel.categories[0]), countryLabel]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <section className="stage-card" aria-label={`A ver ${channel.name}`}>
+      <div className="screen">
+        <iframe
+          src={youtubeLiveUrl(channel.youtube.channelId)}
+          title={`${channel.name} em direto`}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+
+      <div className="stage-head">
+        <Logo channel={channel} size={48} />
+        <div className="stage-title">
+          <h2>{channel.name}</h2>
+          <p className="stage-meta">{meta}</p>
+        </div>
+        <div className="stage-actions">
+          <button className="btn btn-primary" disabled title="O YouTube não deixa gravar este canal">
+            <Circle size={12} strokeWidth={0} fill="var(--rec)" /> Gravar
+          </button>
+          <button
+            className={`icon-btn ${isFav ? 'is-on' : ''}`}
+            onClick={onToggleFav}
+            aria-label={isFav ? 'Tirar dos favoritos' : 'Guardar nos favoritos'}
+            aria-pressed={isFav}
+          >
+            <Star size={18} strokeWidth={1.75} fill={isFav ? 'currentColor' : 'none'} />
+          </button>
+          {channel.website && (
+            <a
+              className="icon-btn stage-link"
+              href={channel.website}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Abrir o site do canal"
+            >
+              <ExternalLink size={18} strokeWidth={1.75} />
+            </a>
+          )}
+          <button className="icon-btn" onClick={onClose} aria-label="Fechar o player">
+            <X size={18} strokeWidth={1.75} />
+          </button>
+        </div>
+      </div>
+
+      <div className="stage-foot">
+        <span>{channel.source}. Este canal não pode ser gravado.</span>
+      </div>
+    </section>
+  )
+}
+
+function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlaying }) {
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
   const onPlayingRef = useRef(onPlaying)

@@ -52,6 +52,10 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 - Proxy em Node para streams HTTP
 - App Android com Capacitor
 
+## Canais com direto oficial
+
+Canais que não têm stream a funcionar no iptv-org mas transmitem em direto oficialmente no YouTube estão em `src/extra.js`, e aparecem primeiro no seu país. Hoje: **TCV**, pelo canal oficial da RTC (@rtc.caboverde). Tocam no leitor do YouTube e não podem ser gravados.
+
 ## Gravação
 
 O botão **● Gravar** no player guarda o programa que estás a ver.

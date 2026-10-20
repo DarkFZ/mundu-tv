@@ -38,6 +38,8 @@ function ChannelRow({ channel, countryLabel, playing, isFav, onPlay, onToggleFav
             </span>
           ) : status ? (
             <span className={`pill pill-${status.kind}`}>{status.text}</span>
+          ) : channel.youtube ? (
+            <span className="row-quality">YouTube</span>
           ) : quality ? (
             <span className="row-quality num">{quality}</span>
           ) : null}
