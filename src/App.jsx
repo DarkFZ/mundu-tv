@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Search, Star, Tv } from 'lucide-react'
+import { ChevronDown, Download, Search, Star, Tv } from 'lucide-react'
 import { loadCatalog } from './api.js'
 import { LUSOPHONE, countryName } from './labels.js'
 import { useFavorites, useRecent } from './useStoredList.js'
 import Player from './components/Player.jsx'
 import ChannelRow, { Logo } from './components/ChannelRow.jsx'
 import Mark from './components/Mark.jsx'
+import InstallInvite from './components/InstallInvite.jsx'
+import { useInstall } from './useInstall.js'
 
 const PAGE = 40
 const MAX_TABS = 7
@@ -31,7 +33,9 @@ export default function App() {
   const [error, setError] = useState(null)
   const [attempt, setAttempt] = useState(0)
 
-  const [view, setView] = useState('canais') // canais | favoritos
+  const [view, setView] = useState(() =>
+    new URLSearchParams(window.location.search).get('vista') === 'favoritos' ? 'favoritos' : 'canais'
+  ) // canais | favoritos
   const [country, setCountry] = useState('CV') // '' = todos os países
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
@@ -42,6 +46,19 @@ export default function App() {
   const { favs, toggle } = useFavorites()
   const { recent, push: pushRecent } = useRecent()
   const isDesktop = useIsDesktop()
+  const installer = useInstall()
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const inviteVisible = installer.available && (installer.showInvite || inviteOpen)
+  const closeInvite = () => {
+    setInviteOpen(false)
+    installer.dismiss()
+  }
+  const startInstall = async () => {
+    if (installer.canPrompt) {
+      await installer.install()
+      setInviteOpen(false)
+    } else setInviteOpen(true)
+  }
 
   useEffect(() => {
     setError(null)
@@ -167,6 +184,11 @@ export default function App() {
           >
             <Star size={16} strokeWidth={1.5} /> Favoritos
           </button>
+          {installer.available && (
+            <button className="nav-item" onClick={startInstall}>
+              <Download size={16} strokeWidth={1.5} /> Instalar app
+            </button>
+          )}
         </nav>
 
         <div className="nav-group">
@@ -230,6 +252,11 @@ export default function App() {
           <span className="topbar-meta num">
             {plural(data.channels.length, 'canal', 'canais')} em {plural(data.countries.length, 'país', 'países')}
           </span>
+        )}
+        {installer.available && (
+          <button className="icon-btn topbar-install" onClick={startInstall} aria-label="Instalar a app">
+            <Download size={18} strokeWidth={1.75} />
+          </button>
         )}
         <div className="topbar-switch" role="tablist" aria-label="Secções">
           <button
@@ -396,7 +423,7 @@ export default function App() {
             ) : (
               <section className="stage-card stage-empty">
                 <div className="screen screen-idle">
-                  <Mark size={28} />
+                  <Mark size={32} muted />
                   <p>Escolhe um canal da lista para começar a ver.</p>
                 </div>
                 <div className="recent">
@@ -425,6 +452,15 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {inviteVisible && (
+        <InstallInvite
+          ios={installer.ios}
+          canPrompt={installer.canPrompt}
+          onInstall={startInstall}
+          onDismiss={closeInvite}
+        />
+      )}
     </div>
   )
 }

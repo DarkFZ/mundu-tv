@@ -108,6 +108,9 @@ h1, h2, p { margin: 0; }
   flex: none;
 }
 .mark { color: var(--accent); flex: none; }
+.mark-dot { fill: var(--text); }
+.mark-muted { color: var(--faint); }
+.mark-muted .mark-dot { fill: currentColor; }
 .wordmark { font-weight: 600; font-size: 16px; letter-spacing: -0.01em; }
 
 .nav, .nav-group { display: flex; flex-direction: column; }
@@ -165,7 +168,7 @@ h1, h2, p { margin: 0; }
   z-index: 10;
   background: var(--ground);
 }
-.topbar-brand, .topbar-switch { display: none; }
+.topbar-brand, .topbar-switch, .topbar-install { display: none; }
 .topbar-meta { margin-left: auto; color: var(--faint); font-size: var(--fs-meta); white-space: nowrap; }
 
 .search {
@@ -566,6 +569,8 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
   }
   .topbar-brand { display: flex; align-items: center; gap: 8px; height: 36px; }
   .topbar-meta { display: none; }
+  .topbar-install { display: inline-flex; margin-left: auto; }
+  .topbar-install + .topbar-switch { margin-left: 0; }
   .topbar-switch {
     display: flex;
     margin-left: auto;
@@ -634,8 +639,44 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
   .toolbar { height: auto; padding: 12px 0; flex-wrap: wrap; }
 }
 
+/* ——— Convite para instalar (primeira visita) ——— */
+.invite {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: flex;
+  gap: 16px;
+  width: 380px;
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: var(--raised);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  animation: invite-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes invite-in { from { opacity: 0; transform: translateY(16px); } }
+.invite-icon { flex: none; width: 56px; height: 56px; border-radius: 14px; }
+.invite-body { flex: 1; min-width: 0; }
+.invite h2 { font-size: var(--fs-section); line-height: 22px; font-weight: 600; padding-right: 28px; }
+.invite p, .invite-steps { margin: 6px 0 0; color: var(--muted); }
+.invite-steps { padding-left: 18px; display: grid; gap: 6px; }
+.invite-steps svg { vertical-align: -3px; color: var(--text); }
+.invite-actions { display: flex; gap: 8px; margin-top: 16px; }
+.invite-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; }
+.btn-ghost { background: none; color: var(--muted); }
+.btn-ghost:hover { color: var(--text); }
+
+@media (max-width: 1023px) {
+  .invite {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+  }
+  .invite-actions .btn { flex: 1; height: 44px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   .rec-dot { animation: none; }
 }
-.screen-idle .mark { color: var(--faint); }

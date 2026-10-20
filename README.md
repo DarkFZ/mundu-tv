@@ -19,6 +19,13 @@ npm run build   # gera a pasta dist/
 
 Na Vercel: importa o repositório. O preset "Vite" é detetado automaticamente.
 
+## App instalável (PWA)
+
+- `public/manifest.webmanifest`: nome, cores, ícones (normal e *maskable*) e um atalho para os Favoritos.
+- `public/sw.js`: guarda a app para abrir depressa e sem rede. Não guarda streams nem a API.
+- Na primeira visita aparece um convite para instalar. No Android/Chrome/Edge abre o diálogo do browser; no iPhone mostra os passos do Safari. Depois de fechado, não volta, mas fica o botão **Instalar app** (barra lateral, ou ícone de download no telemóvel).
+- O logótipo (ecrã com um anel de dez pontos, as dez ilhas) está em `src/components/Mark.jsx` e `public/icon.svg`.
+
 ## Design
 
 Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.claude/skills/` e ficam disponíveis em sessões do Claude Code neste repo.
