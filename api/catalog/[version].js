@@ -3,8 +3,11 @@
 // Em vez de cada pessoa descarregar ~18 MB de listas do iptv-org, o servidor
 // faz isso uma vez e devolve só o que a app usa. A CDN da Vercel guarda a
 // resposta durante 6 horas, por isso esta função quase nunca corre.
+// O endereço leva a versão da publicação (/api/catalog/<commit>): a cache da
+// Vercel não é limpa a cada publicação, e assim cada versão tem a sua cópia
+// (mudanças às regras de legal.js aplicam-se logo).
 // Não toca em vídeo: os streams continuam a ir diretamente do canal para quem vê.
-import { fetchAndBuildCatalog } from '../src/catalog-core.js'
+import { fetchAndBuildCatalog } from '../../src/catalog-core.js'
 
 export default async function handler(req, res) {
   try {
