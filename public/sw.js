@@ -1,6 +1,7 @@
 // Service worker do Mundu TV: guarda a "casca" da app para abrir depressa e sem rede.
-// Não toca nos streams, na API do iptv-org nem nos logótipos (pedidos de outros domínios).
-const CACHE = 'mundu-v2'
+// Não toca nos streams, na API do iptv-org nem nos logótipos (pedidos de outros domínios),
+// nem no proxy de streams (/api/): um direto em cache ficava congelado.
+const CACHE = 'mundu-v3'
 const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
@@ -20,6 +21,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request
   const url = new URL(req.url)
   if (req.method !== 'GET' || url.origin !== self.location.origin) return
+  if (url.pathname.startsWith('/api/')) return
 
   // Páginas: rede primeiro, a cópia guardada se não houver ligação
   if (req.mode === 'navigate') {
