@@ -110,7 +110,12 @@ async function handle(request) {
       signal: AbortSignal.timeout(20_000),
     })
   } catch (e) {
-    return fail(502, `O stream não respondeu (${e.name === 'TimeoutError' ? 'tempo esgotado' : 'erro de ligação'})`)
+    // A causa real (ex.: ECONNREFUSED, ETIMEDOUT, ENOTFOUND) ajuda a perceber se o
+    // servidor do canal está em baixo ou a bloquear a Vercel
+    const code = e.cause?.code || e.cause?.message || e.message
+    const why = e.name === 'TimeoutError' ? 'tempo esgotado' : `erro de ligação: ${code}`
+    console.error('proxy', upstreamUrl.href, why)
+    return fail(502, `O stream não respondeu (${why}) [região ${process.env.VERCEL_REGION || '?'}]`)
   }
 
   if (!upstream.ok && upstream.status !== 206) {
