@@ -32,7 +32,7 @@ export function useFavorites() {
   return { favs, toggle }
 }
 
-export function useRecent(max = 6) {
+export function useRecent(max = 10) {
   const [list, setList] = useStoredList('mundu:recentes')
   const push = (id) => setList((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, max))
   return { recent: list, push }
