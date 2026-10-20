@@ -45,9 +45,22 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 - **Referrer / User-Agent:** alguns streams exigem headers que o browser não deixa definir.
 - **Geo-bloqueio e canais offline:** são comuns. A app salta para o próximo stream, mas alguns canais não funcionam de todo.
 
+## Guia de programação (Agora / A seguir)
+
+O player mostra o programa que está a dar, uma barra de progresso, o programa seguinte e, no computador, a lista do resto do dia.
+
+- `.github/workflows/epg.yml` corre de 6 em 6 horas (ou à mão, em **Actions → EPG → Run workflow**):
+  1. instala o grabber do [iptv-org/epg](https://github.com/iptv-org/epg);
+  2. `scripts/epg/channels.mjs` escolhe, para cada canal da app, um site com guia (`guides.json`), preferindo o mesmo feed do stream e programação em português;
+  3. descarrega 2 dias de programação para `guide.xml` (XMLTV);
+  4. `scripts/epg/split.mjs` parte-o num ficheiro JSON por canal e publica tudo no ramo **`epg`**.
+- A app lê `index.json` e `<canal>.json` de `https://raw.githubusercontent.com/Darkfz/mundu-tv/epg/` (muda com `VITE_EPG_BASE`). Código em `src/epg.js` e `src/components/NowNext.jsx`.
+- Países com guia: variável do repositório `EPG_COUNTRIES` (por omissão `CV,PT,BR,AO,MZ,GW,ST,TL,ES,FR,GB,US`). Dias: `EPG_DAYS` (2).
+- O `vercel.json` impede a Vercel de tentar publicar o ramo `epg`.
+- Nem todos os canais têm guia: muitos canais pequenos e locais não aparecem em nenhum site suportado. Nesses mostra-se "Sem guia de programação para este canal".
+
 ## Próximos passos
 
-- Guia de programação (EPG) via `guides.json` + [iptv-org/epg](https://github.com/iptv-org/epg)
 - PWA (instalar no telemóvel / Smart TV)
 - Proxy em Node para streams HTTP
 - App Android com Capacitor

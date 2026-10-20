@@ -1,0 +1,75 @@
+# Guia de programação (EPG) do Mundu TV
+# Descarrega a programação com o grabber do iptv-org/epg e publica-a, partida por canal,
+# no ramo "epg" deste repositório. A app lê-a de raw.githubusercontent.com.
+name: EPG
+
+on:
+  schedule:
+    - cron: '23 */6 * * *' # de 6 em 6 horas
+  workflow_dispatch:
+    inputs:
+      countries:
+        description: 'Países (códigos separados por vírgulas; vazio = valor por omissão)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epg
+  cancel-in-progress: false
+
+jobs:
+  grab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      # Países cujos canais recebem guia. Muda em Settings > Variables > EPG_COUNTRIES.
+      EPG_COUNTRIES: ${{ inputs.countries || vars.EPG_COUNTRIES || 'CV,PT,BR,AO,MZ,GW,ST,TL,ES,FR,GB,US' }}
+      EPG_DAYS: ${{ vars.EPG_DAYS || '2' }}
+    steps:
+      - name: Código do Mundu TV
+        uses: actions/checkout@v4
+        with:
+          path: mundu
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Grabber do iptv-org/epg
+        run: |
+          git clone --depth 1 https://github.com/iptv-org/epg.git epg
+          cd epg
+          npm ci --no-audit --no-fund   # o postinstall descarrega os dados da API para temp/data
+
+      - name: Lista de canais
+        run: node mundu/scripts/epg/channels.mjs --data epg/temp/data --out epg/mundu.channels.xml
+
+      - name: Descarregar programação
+        working-directory: epg
+        run: |
+          npm run grab --- \
+            --channels=mundu.channels.xml \
+            --output=guide.xml \
+            --days=${EPG_DAYS} \
+            --maxConnections=5 \
+            --timeout=20000
+
+      - name: Partir por canal
+        run: |
+          node mundu/scripts/epg/split.mjs epg/guide.xml out
+          # o ramo epg não é um site: diz à Vercel para não o publicar
+          echo '{ "git": { "deploymentEnabled": { "epg": false } } }' > out/vercel.json
+
+      - name: Publicar no ramo epg
+        working-directory: out
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q -b epg
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "EPG $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push -f -q "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" epg
