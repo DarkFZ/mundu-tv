@@ -36,20 +36,25 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
   - Remove canais NSFW, encerrados ou bloqueados (DMCA).
   - Mostra os nomes de países e categorias em português (`src/labels.js`).
   - Ordena os streams de cada canal: primeiro HTTPS, sem headers especiais, sem geo-bloqueio.
+- `api/proxy.js` (Vercel Function) resolve dois problemas do browser:
+  - **HTTP num site HTTPS:** o browser bloqueia streams `http://`. O proxy vai buscá-los no servidor e devolve-os por HTTPS.
+  - **Referrer / User-Agent:** envia os headers que alguns canais exigem e que o browser não deixa definir.
+  - As playlists `.m3u8` são reescritas para que sub-playlists, segmentos, chaves e `EXT-X-MAP` passem também pelo proxy. Os segmentos HTTPS de canais sem headers continuam diretos.
+  - Recusa endereços internos (localhost, redes privadas) e conteúdo que não seja vídeo/áudio.
+  - Liga-se sozinho no site publicado. `VITE_PROXY=off` desliga; `VITE_PROXY=<url>` usa outro proxy (por exemplo, em `npm run dev`, que não corre a pasta `api/`; para testar tudo localmente usa `vercel dev`).
 - `Player.jsx` usa hls.js (ou HLS nativo no Safari/iOS). Se um stream falhar ou não arrancar em 15 s, tenta o seguinte automaticamente.
 - Favoritos e canais vistos recentemente ficam guardados no browser.
 
 ## Limitações conhecidas
 
-- **HTTP vs HTTPS:** quando a app está publicada em HTTPS, o browser bloqueia streams `http://`. Esses canais aparecem esbatidos. O filtro "Só compatíveis com o browser" esconde-os. Para os suportar, é preciso um proxy no servidor que reescreva as playlists `.m3u8`.
-- **Referrer / User-Agent:** alguns streams exigem headers que o browser não deixa definir.
+- **Geo-bloqueio pelo proxy:** os streams que passam pelo proxy saem dos servidores da Vercel, não da tua rede. Um canal geo-bloqueado pode funcionar ou não conforme a região da função.
+- **Tráfego:** cada canal pelo proxy gasta transferência da Vercel (o plano Hobby tem um limite mensal). Os streams HTTPS continuam diretos e não gastam nada.
 - **Geo-bloqueio e canais offline:** são comuns. A app salta para o próximo stream, mas alguns canais não funcionam de todo.
 
 ## Próximos passos
 
 - Guia de programação (EPG) via `guides.json` + [iptv-org/epg](https://github.com/iptv-org/epg)
 - PWA (instalar no telemóvel / Smart TV)
-- Proxy em Node para streams HTTP
 - App Android com Capacitor
 
 ## Canais com direto oficial

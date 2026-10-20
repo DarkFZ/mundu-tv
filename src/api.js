@@ -13,11 +13,37 @@ async function getJSON(name) {
 const IS_HTTPS_PAGE =
   typeof window !== 'undefined' && window.location.protocol === 'https:'
 
+// Proxy no servidor (api/proxy.js) para streams http:// e para os que exigem
+// Referer / User-Agent. Liga-se sozinho no site publicado; VITE_PROXY=off desliga,
+// e VITE_PROXY=<url> aponta para outro proxy (útil em `npm run dev`).
+const PROXY_ENV = import.meta.env.VITE_PROXY
+const PROXY_BASE =
+  PROXY_ENV === 'off' ? null : PROXY_ENV || (IS_HTTPS_PAGE ? '/api/proxy' : null)
+
+function needsProxy(s) {
+  return (IS_HTTPS_PAGE && s.url.startsWith('http:')) || Boolean(s.referrer || s.user_agent)
+}
+
+// URL a dar ao player: o original, ou através do proxy quando é preciso
+export function streamUrl(s) {
+  if (!PROXY_BASE || !needsProxy(s)) return s.url
+  const p = new URLSearchParams({ url: s.url })
+  if (s.referrer) p.set('ref', s.referrer)
+  if (s.user_agent) p.set('ua', s.user_agent)
+  return `${PROXY_BASE}?${p}`
+}
+
+// O browser consegue tocar este stream (diretamente ou pelo proxy)?
+function canPlay(s) {
+  return Boolean(PROXY_BASE) || !IS_HTTPS_PAGE || s.url.startsWith('https:')
+}
+
 // Ordena streams do mais provável de funcionar para o menos provável
 function streamScore(s) {
   let score = 0
+  // Ligação direta primeiro; o proxy fica para quando é a única hipótese
   if (s.url.startsWith('https:')) score += 100
-  if (!s.referrer && !s.user_agent) score += 50 // o browser não consegue enviar estes headers
+  if (!s.referrer && !s.user_agent) score += 50
   if (!s.labels?.includes('Geo-blocked')) score += 20
   if (!s.labels?.includes('Not 24/7')) score += 10
   score += parseInt(s.quality) / 100 || 0
@@ -74,8 +100,7 @@ export async function loadCatalog() {
       website: c.website,
       logo: logoByChannel.get(c.id)?.url || null,
       streams: sorted,
-      // funciona num site https se tiver pelo menos um stream https
-      browserOk: !IS_HTTPS_PAGE || sorted.some((s) => s.url.startsWith('https:')),
+      browserOk: sorted.some(canPlay),
     })
   }
   // Os diretos oficiais aparecem primeiro; o resto por ordem alfabética
@@ -113,5 +138,5 @@ export function channelStatus(channel) {
 }
 
 export function playableStreams(channel) {
-  return channel.streams.filter((s) => !IS_HTTPS_PAGE || s.url.startsWith('https:'))
+  return channel.streams.filter(canPlay)
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
 import { Circle, ExternalLink, Loader2, RotateCcw, Square, Star, X } from 'lucide-react'
-import { playableStreams } from '../api.js'
+import { playableStreams, streamUrl } from '../api.js'
 import { categoryName, labelName } from '../labels.js'
 import { Logo } from './ChannelRow.jsx'
 import { youtubeLiveUrl } from '../extra.js'
@@ -198,7 +198,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
     if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false })
       hlsRef.current = hls
-      hls.loadSource(stream.url)
+      hls.loadSource(streamUrl(stream))
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}))
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -231,7 +231,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
       })
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari / iOS têm HLS nativo
-      video.src = stream.url
+      video.src = streamUrl(stream)
       video.play().catch(() => {})
       video.onerror = () => {
         clearTimeout(timeout)
