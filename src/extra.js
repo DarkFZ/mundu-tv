@@ -14,6 +14,34 @@ export const EXTRA_CHANNELS = [
     // A programação vem da TCV Internacional (é o guia que existe no iptv-org/epg)
     epgId: 'TCVInternacional.cv',
   },
+
+  // Canais pagos: o Mundu TV não tem direitos para os transmitir, por isso não
+  // toca o sinal. Mostra um atalho para o serviço oficial, onde se entra com a
+  // própria assinatura.
+  {
+    id: 'mundu.sporttv.pt',
+    name: 'SPORT TV',
+    country: 'PT',
+    categories: ['sports'],
+    website: 'https://www.sporttv.pt',
+    subscription: {
+      url: 'https://www.sporttv.pt',
+      provider: 'SPORT TV',
+      note: 'Canal pago. Vê-se na app oficial da SPORT TV ou numa operadora de TV com o canal no pacote.',
+    },
+  },
+  {
+    id: 'mundu.sportv.br',
+    name: 'SporTV',
+    country: 'BR',
+    categories: ['sports'],
+    website: 'https://globoplay.globo.com',
+    subscription: {
+      url: 'https://globoplay.globo.com',
+      provider: 'Globoplay',
+      note: 'Canal pago do Grupo Globo. Vê-se no Globoplay, com o plano que inclui os canais ao vivo.',
+    },
+  },
 ]
 
 export function youtubeLiveUrl(channelId) {

@@ -8,6 +8,7 @@ import ChannelRow, { Logo } from './components/ChannelRow.jsx'
 import Mark from './components/Mark.jsx'
 import InstallInvite from './components/InstallInvite.jsx'
 import { useInstall } from './useInstall.js'
+import { TAKEDOWN_URL } from './legal.js'
 
 const PAGE = 40
 const MAX_TABS = 7
@@ -39,7 +40,6 @@ export default function App() {
   const [country, setCountry] = useState('CV') // '' = todos os países
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
-  const [hideOff, setHideOff] = useState(true)
   const [limit, setLimit] = useState(PAGE)
   const [current, setCurrent] = useState(null)
 
@@ -91,32 +91,28 @@ export default function App() {
     return data.channels.filter((c) => !country || c.country === country)
   }, [data, view, country, favs])
 
-  const playableCount = scoped.filter((c) => c.browserOk).length
-
   // Separadores: as categorias com mais canais neste âmbito
   const tabs = useMemo(() => {
     if (!data) return []
-    const pool = hideOff ? scoped.filter((c) => c.browserOk) : scoped
     const counts = new Map()
-    for (const c of pool) for (const cat of c.categories) counts.set(cat, (counts.get(cat) || 0) + 1)
+    for (const c of scoped) for (const cat of c.categories) counts.set(cat, (counts.get(cat) || 0) + 1)
     return data.categories
       .filter((c) => counts.has(c.id))
       .map((c) => ({ ...c, count: counts.get(c.id) }))
       .sort((a, b) => b.count - a.count)
       .slice(0, MAX_TABS)
-  }, [data, scoped, hideOff])
+  }, [data, scoped])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return scoped.filter((c) => {
-      if (view === 'canais' && hideOff && !c.browserOk) return false
       if (category && !c.categories.includes(category)) return false
       if (q && !c.name.toLowerCase().includes(q)) return false
       return true
     })
-  }, [scoped, view, hideOff, category, query])
+  }, [scoped, category, query])
 
-  useEffect(() => setLimit(PAGE), [view, country, category, query, hideOff])
+  useEffect(() => setLimit(PAGE), [view, country, category, query])
   // Se a categoria escolhida não existir no novo âmbito, volta a "Todas"
   useEffect(() => {
     if (category && !tabs.some((t) => t.id === category)) setCategory('')
@@ -137,16 +133,12 @@ export default function App() {
     view === 'favoritos' ? 'Favoritos' : country ? countryById.get(country) || countryName(country) : 'Todos os países'
 
   const subline = !data
-    ? 'A carregar a lista de canais públicos…'
+    ? 'A carregar a lista de canais abertos…'
     : view === 'favoritos'
       ? scoped.length
         ? `${plural(scoped.length, 'canal guardado', 'canais guardados')} neste dispositivo`
         : 'Os canais que marcares com a estrela ficam aqui'
-      : playableCount === scoped.length
-        ? scoped.length === 1
-          ? 'O único canal da lista toca neste browser'
-          : `Os ${plural(scoped.length, 'canal', 'canais')} da lista tocam neste browser`
-        : `${plural(playableCount, 'canal toca', 'canais tocam')} neste browser, de ${plural(scoped.length, 'canal', 'canais')} na lista`
+      : `${plural(scoped.length, 'canal', 'canais')} na lista`
 
   const player = current && (
     <Player
@@ -344,17 +336,6 @@ export default function App() {
 
             <div className="toolbar">
               <span className="num">{data ? plural(filtered.length, 'canal', 'canais') : '—'}</span>
-              {view === 'canais' && (
-                <label className="switch">
-                  <input
-                    type="checkbox"
-                    checked={hideOff}
-                    onChange={(e) => setHideOff(e.target.checked)}
-                  />
-                  <span className="switch-track" aria-hidden="true" />
-                  Só os que tocam aqui
-                </label>
-              )}
             </div>
 
             {error ? (
@@ -383,13 +364,8 @@ export default function App() {
                     ? 'Ainda não guardaste nenhum canal. Toca na estrela ao lado de um canal para o guardares aqui.'
                     : query
                       ? `Nenhum canal com "${query}" aqui.`
-                      : 'Nenhum canal toca neste browser com estes filtros.'}
+                      : 'Nenhum canal com estes filtros.'}
                 </p>
-                {view === 'canais' && hideOff && scoped.length > playableCount && (
-                  <button className="text-btn" onClick={() => setHideOff(false)}>
-                    Mostrar também os que não tocam aqui
-                  </button>
-                )}
               </div>
             ) : (
               <>
@@ -451,6 +427,16 @@ export default function App() {
           </aside>
           )}
         </div>
+
+        <footer className="legal-foot">
+          <span>
+            Só canais com transmissão aberta na internet. O Mundu TV não aloja nem retransmite vídeo.
+          </span>
+          <a href="/legal.html">Aviso legal</a>
+          <a href={TAKEDOWN_URL} target="_blank" rel="noreferrer">
+            Pedir remoção de um canal
+          </a>
+        </footer>
       </main>
 
       {inviteVisible && (
