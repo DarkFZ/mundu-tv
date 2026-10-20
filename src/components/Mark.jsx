@@ -1,32 +1,40 @@
-// Logótipo do Mundu TV: um ecrã de televisão com um anel de dez pontos
-// (as dez ilhas de Cabo Verde, e o mundo dentro do ecrã)
-const DOTS = Array.from({ length: 10 }, (_, i) => {
-  const a = (i / 10) * Math.PI * 2 - Math.PI / 2
-  return [256 + 74 * Math.cos(a), 256 + 74 * Math.sin(a)]
-})
+// Símbolo do Mundu TV: um play com uma órbita e um satélite à volta —
+// «mundu» é mundo em kriolu, e a marca é o mundo inteiro num ecrã.
+// Igual a public/brand/mundu-mark.svg. Com `muted`, desenha a versão
+// de uma só cor (segue o CSS `color`), para estados vazios e fundos de cor.
+import { useId } from 'react'
 
 export default function Mark({ size = 28, muted = false }) {
+  const maskId = useId()
+
+  if (muted) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 96 96" aria-hidden="true" className="mark mark-muted">
+        <defs>
+          <mask id={maskId}>
+            <rect width="96" height="96" fill="#fff" />
+            <g transform="rotate(-20 48 50)">
+              <ellipse cx="48" cy="50" rx="37" ry="14" fill="none" stroke="#000" strokeWidth="5" />
+              <circle cx="76" cy="41" r="5.5" fill="#000" />
+            </g>
+            <path d="M39 31 L39 67 L69 49 Z" fill="#000" stroke="#000" strokeWidth="8" strokeLinejoin="round" />
+          </mask>
+        </defs>
+        <rect width="96" height="96" rx="24" fill="currentColor" mask={`url(#${maskId})`} />
+      </svg>
+    )
+  }
+
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="96 96 320 320"
-      aria-hidden="true"
-      className={`mark ${muted ? 'mark-muted' : ''}`}
-    >
-      <rect
-        x="112"
-        y="146"
-        width="288"
-        height="220"
-        rx="58"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="30"
-      />
-      {DOTS.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r="15" className="mark-dot" />
-      ))}
+    <svg width={size} height={size} viewBox="0 0 96 96" aria-hidden="true" className="mark">
+      <rect width="96" height="96" rx="24" fill="#1D4ED8" />
+      <ellipse cx="48" cy="50" rx="37" ry="14" transform="rotate(-20 48 50)"
+        fill="none" stroke="#FFC233" strokeWidth="5" />
+      <path d="M39 31 L39 67 L69 49 Z" fill="#FFFFFF" stroke="#FFFFFF" strokeWidth="8" strokeLinejoin="round" />
+      <g transform="rotate(-20 48 50)">
+        <path d="M11 50 A37 14 0 0 0 85 50" fill="none" stroke="#FFC233" strokeWidth="5" strokeLinecap="round" />
+        <circle cx="76" cy="41" r="5.5" fill="#FFC233" />
+      </g>
     </svg>
   )
 }

@@ -4,7 +4,7 @@ Direção dada pela Taste Skill (`.taste-skill/direction.json`): estilo **true-b
 
 - **Pergunta do ecrã:** "O que posso ver agora?" O player é o maior bloco; a lista serve-o.
 - **Chão e elevação:** #000 → cartão #111 → painel #2a2a2a. Sem sombras nem bordas em cartões.
-- **Cor:** uma só cor de dado, o azul do mar (`--accent: #4cb3f0`), na marca e no canal que está a tocar. Nunca em botões, separadores ou navegação.
+- **Cor:** identidade Mundu TV (ver `src/brand.css`): fundo azul-noite `#0B1020`, azul *mar* `#5B8CFF` na marca, no canal a tocar e no botão principal; amarelo *sol* `#FFC233` no foco e nos favoritos; vermelho *vivo* `#FF5470` só para direto/gravar e erros. Logótipos em `public/brand/`.
 - **Ação principal:** pílula branca invertida (Gravar). Vermelho só para gravação e erros.
 - **Tipo:** Inter 400/500/600. Título 20, secção 16, corpo 14, meta 13/12. Números em `tabular-nums`.
 - **Navegação:** o item ativo só muda de cinzento (#bbb) para branco.

@@ -1,0 +1,61 @@
+/*
+  Mundu TV — identidade visual (tema Noite).
+  Tokens da marca e mapeamento para as variáveis já usadas em styles.css.
+  Carregado depois de styles.css, por isso estas definições ganham.
+  Fonte: design system «Mundu TV» (cores mar / sol / vivo).
+*/
+:root {
+  /* tokens da marca */
+  --mt-surface: #0B1020;
+  --mt-surface-raised: #141B31;
+  --mt-line: #263052;
+  --mt-ink: #F2F4FA;
+  --mt-ink-muted: #A3ABC4;
+  --mt-mar: #5B8CFF;
+  --mt-mar-soft: #16244F;
+  --mt-on-mar: #0B1020;
+  --mt-sol: #FFC233;
+  --mt-on-sol: #0B1020;
+  --mt-vivo: #FF5470;
+  --mt-on-vivo: #0B1020;
+  --mt-focus: #FFC233;
+  --mt-font-display: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
+  --mt-font-sans: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* mapeamento para as variáveis da app */
+  --ground: var(--mt-surface);
+  --surface: var(--mt-surface-raised);
+  --raised: #1E2742;
+  --active: #182041;
+  --border: var(--mt-line);
+  --rule: #1C2440;
+  --control: #3A4670;
+  --text: var(--mt-ink);
+  --nav: #C3C9DC;
+  --muted: var(--mt-ink-muted);
+  --faint: #949FBD;
+  --accent: var(--mt-mar);
+  --rec: var(--mt-vivo);
+  --negative: var(--mt-vivo);
+  --pill-negative-bg: #3A1426; --pill-negative-ink: #FF8A9C;
+  --pill-warning-bg: #3A2E0E;  --pill-warning-ink: var(--mt-sol);
+  --pill-neutral-bg: #222B48;  --pill-neutral-ink: #D3D8E8;
+  --font: var(--mt-font-sans);
+}
+
+::selection { background: var(--mt-mar); color: var(--mt-on-mar); }
+
+/* ação principal: pílula mar */
+.btn-primary { background: var(--mt-mar); color: var(--mt-on-mar); }
+.btn-primary:hover:not(:disabled) { background: #7BA3FF; }
+
+/* foco visível para teclado e comando da TV */
+:focus-visible { outline: 3px solid var(--mt-focus); outline-offset: 2px; }
+
+/* marca */
+.mark { border-radius: 25%; }
+.wordmark {
+  font-family: var(--mt-font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
