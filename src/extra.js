@@ -11,6 +11,8 @@ export const EXTRA_CHANNELS = [
     // Canal oficial da RTC - Rádio Televisão Cabo-verdiana (@rtc.caboverde)
     youtube: { channelId: 'UCE8NLIaNMwDy-LKUTcCU-5g' },
     source: 'Direto oficial da RTC no YouTube',
+    // A programação vem da TCV Internacional (é o guia que existe no iptv-org/epg)
+    epgId: 'TCVInternacional.cv',
   },
 ]
 

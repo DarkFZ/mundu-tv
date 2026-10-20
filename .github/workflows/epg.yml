@@ -1,0 +1,69 @@
+# Guia de programação (EPG)
+#
+# Duas vezes por dia, descarrega a programação dos canais do Mundu TV com o
+# grabber do iptv-org/epg e publica-a no branch `epg-data` (um JSON por canal).
+# A app lê esses ficheiros em raw.githubusercontent.com.
+name: EPG
+
+on:
+  schedule:
+    - cron: '17 4,16 * * *' # 04:17 e 16:17 UTC
+  workflow_dispatch:
+    inputs:
+      countries:
+        description: 'Países (códigos separados por vírgula). Vazio = lusófonos'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epg
+  cancel-in-progress: false
+
+jobs:
+  grab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Descarregar o grabber do iptv-org/epg
+        run: |
+          git clone --depth 1 -b master https://github.com/iptv-org/epg.git ../epg
+          cd ../epg && npm ci --no-audit --no-fund
+
+      - name: Escolher os canais
+        env:
+          EPG_COUNTRIES: ${{ inputs.countries }}
+        run: node scripts/epg/channels.mjs ../epg "$RUNNER_TEMP/mundu.channels.xml"
+
+      - name: Descarregar a programação
+        # Algumas fontes falham ou bloqueiam; o que vier, serve
+        continue-on-error: true
+        run: |
+          cd ../epg
+          npm run grab --- \
+            --channels="$RUNNER_TEMP/mundu.channels.xml" \
+            --output="$RUNNER_TEMP/guide.xml" \
+            --days=2 --maxConnections=8 --timeout=20000
+
+      - name: Converter para JSON
+        run: |
+          test -s "$RUNNER_TEMP/guide.xml" || { echo "O grabber não gerou nenhum guia"; exit 1; }
+          node scripts/epg/publish.mjs "$RUNNER_TEMP/guide.xml" "$RUNNER_TEMP/mundu.channels.map.json" "$RUNNER_TEMP/epg-data"
+
+      - name: Publicar no branch epg-data
+        run: |
+          cd "$RUNNER_TEMP/epg-data"
+          git init -q -b epg-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Programação de $(date -u +'%Y-%m-%d %H:%M') UTC"
+          # Um só commit, sempre substituído: o histórico não cresce
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" epg-data

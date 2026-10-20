@@ -53,13 +53,20 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 
 ## Próximos passos
 
-- Guia de programação (EPG) via `guides.json` + [iptv-org/epg](https://github.com/iptv-org/epg)
 - PWA (instalar no telemóvel / Smart TV)
 - App Android com Capacitor
 
 ## Canais com direto oficial
 
 Canais que não têm stream a funcionar no iptv-org mas transmitem em direto oficialmente no YouTube estão em `src/extra.js`, e aparecem primeiro no seu país. Hoje: **TCV**, pelo canal oficial da RTC (@rtc.caboverde). Tocam no leitor do YouTube e não podem ser gravados.
+
+## Programação (EPG)
+
+- A GitHub Action `.github/workflows/epg.yml` corre às 04:17 e às 16:17 UTC (e à mão, em *Actions → EPG → Run workflow*).
+- `scripts/epg/channels.mjs` escolhe os canais: os da app nos países lusófonos (ou os que indicares no campo "countries"), com a melhor fonte do [iptv-org/epg](https://github.com/iptv-org/epg) para cada um.
+- O grabber descarrega 2 dias de programação; `scripts/epg/publish.mjs` converte-a num JSON por canal, publicado no branch `epg-data` (um só commit, sempre substituído; a Vercel não faz deploy desse branch).
+- No player aparece o que está a dar (com barra de progresso), o seguinte e a lista por dia. Canais sem fonte de programação não mostram nada.
+- A TCV usa o guia da TCV Internacional (`epgId` em `src/extra.js`).
 
 ## Projetar na TV
 

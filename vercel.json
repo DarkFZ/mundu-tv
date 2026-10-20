@@ -2,5 +2,8 @@
   "regions": ["cdg1"],
   "functions": {
     "api/proxy.js": { "maxDuration": 300 }
+  },
+  "git": {
+    "deploymentEnabled": { "epg-data": false }
   }
 }

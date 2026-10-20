@@ -681,3 +681,28 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   .rec-dot { animation: none; }
 }
+
+/* Programação (EPG) */
+.guide { margin-top: 12px; padding: 14px 4px 2px; border-top: 1px solid var(--rule); }
+.guide-title { margin-top: 6px; font-size: var(--fs-section); line-height: 22px; font-weight: 600; }
+.guide-bar { height: 3px; margin-top: 8px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.guide-bar span { display: block; height: 100%; background: var(--accent); }
+.guide-time { margin-top: 6px; font-size: var(--fs-small); color: var(--faint); }
+.guide-desc { margin-top: 6px; color: var(--muted); font-size: var(--fs-meta); line-height: 18px; max-width: 64ch; }
+.guide-next { margin-top: 12px; color: var(--muted); font-size: var(--fs-meta); }
+.guide-next .num { color: var(--faint); margin-right: 6px; }
+.guide-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 10px; padding: 6px 0; border: 0; background: none;
+  color: var(--text); font-size: var(--fs-meta); font-weight: 500;
+}
+.guide-toggle svg { transition: transform 160ms ease-out; color: var(--faint); }
+.guide-toggle svg.is-flipped { transform: rotate(180deg); }
+.guide-list { max-height: 320px; overflow-y: auto; margin-top: 4px; padding-right: 4px; }
+.guide-list h3 { position: sticky; top: 0; padding: 8px 0 6px; background: var(--surface); font-size: var(--fs-small); font-weight: 600; color: var(--faint); text-transform: capitalize; }
+.guide-list ol { list-style: none; margin: 0; padding: 0; }
+.guide-list li { display: grid; grid-template-columns: 48px 1fr; gap: 8px; padding: 6px 0; font-size: var(--fs-meta); border-bottom: 1px solid var(--rule); }
+.guide-list li .num { color: var(--faint); }
+.guide-list li small { display: block; color: var(--faint); font-size: var(--fs-small); }
+.guide-list li.is-now { color: var(--accent); }
+.guide-list li.is-now .num { color: var(--accent); }

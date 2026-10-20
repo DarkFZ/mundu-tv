@@ -5,6 +5,7 @@ import { playableStreams, streamUrl } from '../api.js'
 import { categoryName, labelName } from '../labels.js'
 import { Logo } from './ChannelRow.jsx'
 import { youtubeLiveUrl } from '../extra.js'
+import Guide from './Guide.jsx'
 import { castChannel, stopCasting, useCast } from '../cast.js'
 
 const MAX_BYTES = 2 * 1024 ** 3 // pára sozinho aos 2 GB para não esgotar a memória
@@ -108,6 +109,7 @@ function YouTubeStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPl
       <div className="stage-foot">
         <span>{channel.source}. Este canal não pode ser gravado.</span>
       </div>
+      <Guide channelId={channel.id} />
     </section>
   )
 }
@@ -490,6 +492,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
           )}
         </div>
       )}
+      <Guide channelId={channel.id} />
     </section>
   )
 }
