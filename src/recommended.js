@@ -9,11 +9,14 @@ export const RECOMMENDED = [
   {
     id: 'desporto',
     title: 'Desporto',
+    // Futebol primeiro: FIFA+ e a TCV (jogos da seleção e do campeonato nacional)
     channels: [
+      'FIFAPlus.uk',
+      'TCV.cv',
+      'FIFAPlusWomen.uk',
       'NSports.br',
       'FUELTV.pt',
       'RedBullTV.at',
-      'FIFAPlus.uk',
       'NFLChannel.us',
       'NHLNetwork.us',
       'FightNetwork.ca',
