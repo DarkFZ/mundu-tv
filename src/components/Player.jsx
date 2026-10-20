@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
-import { Airplay, Cast, Circle, ExternalLink, Loader2, RotateCcw, Square, Star, X } from 'lucide-react'
+import { Airplay, Cast, ExternalLink, Loader2, Lock, RotateCcw, Star, X } from 'lucide-react'
 import { playableStreams, streamUrl } from '../api.js'
 import { categoryName, labelName } from '../labels.js'
 import { Logo } from './ChannelRow.jsx'
@@ -8,44 +8,57 @@ import { youtubeLiveUrl } from '../extra.js'
 import Guide from './Guide.jsx'
 import { castChannel, stopCasting, useCast } from '../cast.js'
 
-const MAX_BYTES = 2 * 1024 ** 3 // pára sozinho aos 2 GB para não esgotar a memória
-
-function formatTime(sec) {
-  const h = Math.floor(sec / 3600)
-  const m = Math.floor((sec % 3600) / 60)
-  const s = Math.floor(sec % 60)
-  const mm = String(m).padStart(2, '0')
-  const ss = String(s).padStart(2, '0')
-  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
-}
-
-function formatSize(bytes) {
-  return bytes >= 1024 ** 3
-    ? `${(bytes / 1024 ** 3).toFixed(2)} GB`
-    : `${Math.max(0.1, bytes / 1024 ** 2).toFixed(1)} MB`
-}
-
-function fileName(channel, ext) {
-  const d = new Date()
-  const p = (n) => String(n).padStart(2, '0')
-  const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}h${p(d.getMinutes())}`
-  const safe = channel.name.replace(/[^\w\-]+/g, '_')
-  return `${safe}_${stamp}.${ext}`
-}
-
-function download(blob, name) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 60_000)
-}
-
 export default function Player(props) {
+  if (props.channel.subscription) return <SubscriptionStage {...props} />
   return props.channel.youtube ? <YouTubeStage {...props} /> : <HlsStage {...props} />
+}
+
+// Canais pagos: sem sinal na app, só o atalho para o serviço oficial
+function SubscriptionStage({ channel, countryLabel, onClose, isFav, onToggleFav }) {
+  const sub = channel.subscription
+  const meta = [channel.categories[0] && categoryName(channel.categories[0]), countryLabel]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <section className="stage-card" aria-label={channel.name}>
+      <div className="screen">
+        <div className="screen-overlay">
+          <Lock size={22} strokeWidth={1.75} />
+          <strong>{channel.name} precisa de assinatura</strong>
+          <span>{sub.note}</span>
+          <a className="btn btn-primary" href={sub.url} target="_blank" rel="noreferrer">
+            <ExternalLink size={16} strokeWidth={1.75} /> Abrir {sub.provider}
+          </a>
+        </div>
+      </div>
+
+      <div className="stage-head">
+        <Logo channel={channel} size={48} />
+        <div className="stage-title">
+          <h2>{channel.name}</h2>
+          <p className="stage-meta">{meta}</p>
+        </div>
+        <div className="stage-actions">
+          <button
+            className={`icon-btn ${isFav ? 'is-on' : ''}`}
+            onClick={onToggleFav}
+            aria-label={isFav ? 'Tirar dos favoritos' : 'Guardar nos favoritos'}
+            aria-pressed={isFav}
+          >
+            <Star size={18} strokeWidth={1.75} fill={isFav ? 'currentColor' : 'none'} />
+          </button>
+          <button className="icon-btn" onClick={onClose} aria-label="Fechar o player">
+            <X size={18} strokeWidth={1.75} />
+          </button>
+        </div>
+      </div>
+
+      <div className="stage-foot">
+        <span>O Mundu TV não transmite canais pagos. Este atalho leva ao serviço oficial.</span>
+      </div>
+    </section>
+  )
 }
 
 // Canais com direto oficial no YouTube: o vídeo vem do leitor do YouTube
@@ -78,9 +91,6 @@ function YouTubeStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPl
           <p className="stage-meta">{meta}</p>
         </div>
         <div className="stage-actions">
-          <button className="btn btn-primary" disabled title="O YouTube não deixa gravar este canal">
-            <Circle size={12} strokeWidth={0} fill="var(--rec)" /> Gravar
-          </button>
           <button
             className={`icon-btn ${isFav ? 'is-on' : ''}`}
             onClick={onToggleFav}
@@ -107,7 +117,7 @@ function YouTubeStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPl
       </div>
 
       <div className="stage-foot">
-        <span>{channel.source}. Este canal não pode ser gravado.</span>
+        <span>{channel.source}.</span>
       </div>
       <Guide channelId={channel.id} />
     </section>
@@ -119,26 +129,22 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
   const hlsRef = useRef(null)
   const onPlayingRef = useRef(onPlaying)
   onPlayingRef.current = onPlaying
-  const recRef = useRef(null) // gravação em curso: { chunks, bytes, start, ext, initPromise }
   const streams = playableStreams(channel)
   const [index, setIndex] = useState(0)
   const [status, setStatus] = useState('loading') // loading | playing | failed
   // Formato do stream atual: HLS (.m3u8) ou MPEG-TS contínuo (ex.: /play/a02z)
   const [format, setFormat] = useState('hls')
   const [reconnect, setReconnect] = useState(0) // nova ligação ao mesmo stream
-  const [rec, setRec] = useState(null) // { seconds, bytes } para a interface
-  const [recError, setRecError] = useState(null) // mensagem de erro no rodapé (gravar / projetar)
+  const [castError, setCastError] = useState(null) // mensagem de erro no rodapé
   const cast = useCast(videoRef)
   const onTv = cast.kind === 'cast' && cast.connectedTo
 
-  // No iOS o HLS é nativo e não deixa ler os segmentos; MPEG-TS também não grava
-  const canRecord = Hls.isSupported() && format === 'hls'
   // O recetor da TV só toca HLS; MPEG-TS contínuo fica no telemóvel
   const canCast = cast.available && format === 'hls' && status === 'playing'
 
   const castedRef = useRef(null) // URL que está na TV, para não o enviar duas vezes
   const projectToTv = async () => {
-    setRecError(null)
+    setCastError(null)
     const stream = streams[index]
     castedRef.current = streamUrl(stream)
     try {
@@ -152,7 +158,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
     } catch (e) {
       castedRef.current = null
       if (e === 'cancel' || e?.code === 'cancel') return // fechou o seletor de TVs
-      setRecError('Não foi possível projetar este canal na TV.')
+      setCastError('Não foi possível projetar este canal na TV.')
     }
   }
 
@@ -181,52 +187,6 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
     if (format === 'hls' && stream && castedRef.current !== streamUrl(stream)) projectToTv()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id, index, format, onTv])
-
-  // Termina a gravação e descarrega o ficheiro
-  const stopRecording = useCallback(async () => {
-    const r = recRef.current
-    if (!r) return
-    recRef.current = null
-    setRec(null)
-    if (hlsRef.current) hlsRef.current.loadLevel = -1 // volta à qualidade automática
-
-    if (r.encrypted) {
-      setRecError('Este stream é encriptado e não pode ser gravado.')
-      return
-    }
-    if (!r.chunks.length) {
-      setRecError('Não chegou nenhum segmento de vídeo. Grava durante mais tempo.')
-      return
-    }
-    const init = r.initPromise ? await r.initPromise : null
-    const parts = init ? [init, ...r.chunks] : r.chunks
-    const type = r.ext === 'mp4' ? 'video/mp4' : 'video/mp2t'
-    download(new Blob(parts, { type }), fileName(channel, r.ext))
-  }, [channel])
-
-  const startRecording = () => {
-    setRecError(null)
-    recRef.current = { chunks: [], bytes: 0, start: Date.now(), ext: 'ts', initPromise: null }
-    const hls = hlsRef.current
-    // Fixa a qualidade atual: mudar a meio deixaria o ficheiro com saltos
-    if (hls && hls.currentLevel >= 0) hls.loadLevel = hls.currentLevel
-    setRec({ seconds: 0, bytes: 0 })
-  }
-
-  // Atualiza o contador da gravação a cada segundo
-  useEffect(() => {
-    if (!rec) return
-    const t = setInterval(() => {
-      const r = recRef.current
-      if (!r) return
-      if (r.bytes >= MAX_BYTES) {
-        stopRecording()
-        return
-      }
-      setRec({ seconds: (Date.now() - r.start) / 1000, bytes: r.bytes })
-    }, 1000)
-    return () => clearInterval(t)
-  }, [rec !== null, stopRecording]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const video = videoRef.current
@@ -278,8 +238,8 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         Promise.resolve(ts.play()).catch(() => {})
         ts.on(mpegts.Events.ERROR, () => {
           clearTimeout(timeout)
-          // Se já estava a tocar, a ligação caiu (o proxy corta ao fim de alguns
-          // minutos): liga outra vez ao mesmo stream. Senão, passa ao seguinte.
+          // Se já estava a tocar, a ligação caiu: liga outra vez ao mesmo stream.
+          // Senão, passa ao seguinte.
           if (started) setReconnect((n) => n + 1)
           else next()
         })
@@ -298,27 +258,6 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         else next()
       })
 
-      // Gravação: copia cada segmento de vídeo tal como chega (sem recomprimir)
-      hls.on(Hls.Events.FRAG_LOADED, (_, data) => {
-        const r = recRef.current
-        if (!r || data.frag.type !== 'main' || data.part || !data.payload) return
-        const method = data.frag.decryptdata?.method
-        if (method && method !== 'NONE') {
-          r.encrypted = true
-          return
-        }
-        // Streams fMP4 precisam do segmento de inicialização no início do ficheiro
-        const initUrl = data.frag.initSegment?.url
-        if (initUrl && !r.initPromise) {
-          r.ext = 'mp4'
-          r.initPromise = fetch(initUrl)
-            .then((res) => (res.ok ? res.arrayBuffer() : null))
-            .catch(() => null)
-        }
-        const copy = data.payload.slice(0) // cópia: o hls.js transfere o original
-        r.chunks.push(copy)
-        r.bytes += copy.byteLength
-      })
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari / iOS têm HLS nativo
       video.src = streamUrl(stream)
@@ -331,7 +270,6 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
 
     return () => {
       clearTimeout(timeout)
-      stopRecording() // ao mudar de canal ou fechar, guarda o que já foi gravado
       video.removeEventListener('playing', onPlaying)
       video.removeEventListener('playing', onFirstPlay)
       video.onerror = null
@@ -368,11 +306,6 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
             </button>
           </div>
         )}
-        {rec && (
-          <div className="rec-badge num" aria-live="polite">
-            <span className="rec-dot" /> REC {formatTime(rec.seconds)} · {formatSize(rec.bytes)}
-          </div>
-        )}
         {status === 'loading' && stream && (
           <div className="screen-overlay">
             <Loader2 size={22} className="spin" />
@@ -386,8 +319,8 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
             <strong>Este canal não está a responder</strong>
             <span>
               {streams.length === 0
-                ? 'Só tem streams HTTP, que o browser bloqueia num site seguro.'
-                : `Tentámos ${streams.length === 1 ? 'o único stream' : `os ${streams.length} streams`}. Pode estar offline ou bloqueado na tua região.`}
+                ? 'Não tem nenhum stream oficial disponível neste momento.'
+                : `Tentámos ${streams.length === 1 ? 'o único stream' : `os ${streams.length} streams`}. Pode estar offline.`}
             </span>
             {streams.length > 0 && (
               <button className="btn btn-secondary" onClick={() => { setFormat('hls'); setIndex(0) }}>
@@ -405,28 +338,6 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
           <p className="stage-meta">{meta}</p>
         </div>
         <div className="stage-actions">
-          <button
-            className={`btn ${rec ? 'btn-rec' : 'btn-primary'}`}
-            onClick={rec ? stopRecording : startRecording}
-            disabled={!canRecord || status !== 'playing'}
-            title={
-              !canRecord
-                ? 'O Safari do iPhone e do iPad não deixa gravar'
-                : status !== 'playing'
-                  ? 'Espera que o canal comece a tocar'
-                  : undefined
-            }
-          >
-            {rec ? (
-              <>
-                <Square size={14} strokeWidth={0} fill="currentColor" /> Parar
-              </>
-            ) : (
-              <>
-                <Circle size={12} strokeWidth={0} fill="var(--rec)" /> Gravar
-              </>
-            )}
-          </button>
           {cast.available && (
             <button
               className={`icon-btn ${onTv ? 'is-on' : ''}`}
@@ -473,7 +384,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         </div>
       </div>
 
-      {(stream?.labels?.length > 0 || streams.length > 1 || recError) && (
+      {(stream?.labels?.length > 0 || streams.length > 1 || castError) && (
         <div className="stage-foot">
           {streams.length > 1 && (
             <span className="num">
@@ -485,9 +396,9 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
               {labelName(l)}
             </span>
           ))}
-          {recError && (
-            <button className="stage-error" onClick={() => setRecError(null)}>
-              {recError}
+          {castError && (
+            <button className="stage-error" onClick={() => setCastError(null)}>
+              {castError}
             </button>
           )}
         </div>

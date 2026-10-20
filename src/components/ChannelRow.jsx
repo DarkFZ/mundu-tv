@@ -24,7 +24,7 @@ function ChannelRow({ channel, countryLabel, playing, isFav, onPlay, onToggleFav
     .join(' · ')
 
   return (
-    <li className={`row ${playing ? 'is-playing' : ''} ${channel.browserOk ? '' : 'is-off'}`}>
+    <li className={`row ${playing ? 'is-playing' : ''}`}>
       <button className="row-main" onClick={() => onPlay(channel)}>
         <Logo channel={channel} />
         <span className="row-text">

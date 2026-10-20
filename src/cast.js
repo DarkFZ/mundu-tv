@@ -4,8 +4,7 @@
 //   buscar o stream sozinha; o telemóvel fica livre e pode até bloquear o ecrã.
 // - AirPlay (Safari no iPhone, iPad e Mac): o seletor nativo do Safari.
 //
-// Os streams que passam pelo proxy são enviados com o URL completo do proxy
-// (HTTPS e com CORS), por isso também funcionam na TV.
+// A TV recebe o URL original do canal, tal como o browser.
 import { useEffect, useState } from 'react'
 
 const SDK = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1'
@@ -79,7 +78,7 @@ export function useCast(videoRef) {
   return { kind, available, connectedTo }
 }
 
-// Envia o canal para a TV. `url` pode ser relativo (/api/proxy?...).
+// Envia o canal para a TV.
 export async function castChannel({ kind, video, url, title, logo }) {
   if (kind === 'airplay') {
     video?.webkitShowPlaybackTargetPicker?.()

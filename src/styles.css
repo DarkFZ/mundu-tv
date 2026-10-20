@@ -2,7 +2,7 @@
   Mundu TV — estilo "true-black flat" (taste-skill, seed 1299611519)
   Elevação só por luminosidade: chão #000, cartão #111, painel #2a2a2a. Sem sombras nem bordas em cartões.
   Uma só cor de dado: o azul do mar entre as ilhas, só no que está a tocar e na marca.
-  A ação principal é uma pílula branca invertida; o vermelho é só para gravar e para erros.
+  A ação principal é uma pílula branca invertida; o vermelho é só para direto e para erros.
 */
 :root {
   --ground: #000000;
@@ -706,3 +706,19 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
 .guide-list li small { display: block; color: var(--faint); font-size: var(--fs-small); }
 .guide-list li.is-now { color: var(--accent); }
 .guide-list li.is-now .num { color: var(--accent); }
+
+/* Rodapé legal: o que a app é, aviso legal e pedidos de remoção */
+.legal-foot {
+  margin-top: 40px;
+  padding-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--faint);
+}
+.legal-foot span { flex: 1 1 100%; }
+.legal-foot a { color: var(--muted); }
+.legal-foot a:hover { color: var(--text); }
+.screen-overlay a.btn { text-decoration: none; margin-top: 4px; }

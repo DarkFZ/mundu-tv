@@ -1,6 +1,7 @@
 // Dados públicos do projeto iptv-org (https://github.com/iptv-org/api)
 import { countryName, categoryName } from './labels.js'
 import { EXTRA_CHANNELS } from './extra.js'
+import { REMOVED_CHANNELS } from './legal.js'
 
 const BASE = import.meta.env.VITE_API_BASE || 'https://iptv-org.github.io/api'
 
@@ -10,41 +11,29 @@ async function getJSON(name) {
   return res.json()
 }
 
-const IS_HTTPS_PAGE =
-  typeof window !== 'undefined' && window.location.protocol === 'https:'
-
-// Proxy no servidor (api/proxy.js) para streams http:// e para os que exigem
-// Referer / User-Agent. Liga-se sozinho no site publicado; VITE_PROXY=off desliga,
-// e VITE_PROXY=<url> aponta para outro proxy (útil em `npm run dev`).
-const PROXY_ENV = import.meta.env.VITE_PROXY
-const PROXY_BASE =
-  PROXY_ENV === 'off' ? null : PROXY_ENV || (IS_HTTPS_PAGE ? '/api/proxy' : null)
-
-function needsProxy(s) {
-  return (IS_HTTPS_PAGE && s.url.startsWith('http:')) || Boolean(s.referrer || s.user_agent)
+// Regras de legalidade (ver README, secção "Legalidade"):
+// - O Mundu TV não retransmite nada: o browser liga-se diretamente ao servidor
+//   do canal. Não há proxy, por isso só servem streams HTTPS.
+// - Não finge ser outro site nem outro programa: streams que exigem Referer ou
+//   User-Agent especiais (proteção contra uso fora do site do canal) ficam de fora.
+// - Não contorna restrições de região: streams marcados como geo-bloqueados ficam de fora.
+export function isLegalStream(s) {
+  return (
+    s.url.startsWith('https:') &&
+    !s.referrer &&
+    !s.user_agent &&
+    !s.labels?.includes('Geo-blocked')
+  )
 }
 
-// URL a dar ao player: o original, ou através do proxy quando é preciso
+// O URL que o player usa é sempre o original do canal
 export function streamUrl(s) {
-  if (!PROXY_BASE || !needsProxy(s)) return s.url
-  const p = new URLSearchParams({ url: s.url })
-  if (s.referrer) p.set('ref', s.referrer)
-  if (s.user_agent) p.set('ua', s.user_agent)
-  return `${PROXY_BASE}?${p}`
-}
-
-// O browser consegue tocar este stream (diretamente ou pelo proxy)?
-function canPlay(s) {
-  return Boolean(PROXY_BASE) || !IS_HTTPS_PAGE || s.url.startsWith('https:')
+  return s.url
 }
 
 // Ordena streams do mais provável de funcionar para o menos provável
 function streamScore(s) {
   let score = 0
-  // Ligação direta primeiro; o proxy fica para quando é a única hipótese
-  if (s.url.startsWith('https:')) score += 100
-  if (!s.referrer && !s.user_agent) score += 50
-  if (!s.labels?.includes('Geo-blocked')) score += 20
   if (!s.labels?.includes('Not 24/7')) score += 10
   score += parseInt(s.quality) / 100 || 0
   return -score
@@ -61,12 +50,13 @@ export async function loadCatalog() {
       getJSON('blocklist'),
     ])
 
-  const blocked = new Set(blocklist.map((b) => b.channel))
+  // Bloqueados pelo iptv-org (pedidos DMCA, NSFW) e pedidos de remoção feitos ao Mundu TV
+  const blocked = new Set([...blocklist.map((b) => b.channel), ...REMOVED_CHANNELS.map((r) => r.id)])
 
-  // Agrupa streams por canal
+  // Agrupa os streams legais por canal
   const streamsByChannel = new Map()
   for (const s of streams) {
-    if (!s.channel) continue
+    if (!s.channel || !isLegalStream(s)) continue
     if (!streamsByChannel.has(s.channel)) streamsByChannel.set(s.channel, [])
     streamsByChannel.get(s.channel).push(s)
   }
@@ -80,18 +70,16 @@ export async function loadCatalog() {
   }
 
   const extraIds = new Set(EXTRA_CHANNELS.map((c) => c.id))
-  const list = EXTRA_CHANNELS.map((c) => ({
+  const list = EXTRA_CHANNELS.filter((c) => !blocked.has(c.id)).map((c) => ({
     ...c,
-    logo: logoByChannel.get(c.id)?.url || c.logo,
+    logo: logoByChannel.get(c.id)?.url || c.logo || null,
     streams: [],
-    browserOk: true,
-    featured: true,
+    featured: !c.subscription,
   }))
   for (const c of channels) {
     if (c.is_nsfw || c.closed || blocked.has(c.id) || extraIds.has(c.id)) continue
     const chStreams = streamsByChannel.get(c.id)
     if (!chStreams?.length) continue
-    const sorted = [...chStreams].sort((a, b) => streamScore(a) - streamScore(b))
     list.push({
       id: c.id,
       name: c.name,
@@ -99,8 +87,7 @@ export async function loadCatalog() {
       categories: c.categories || [],
       website: c.website,
       logo: logoByChannel.get(c.id)?.url || null,
-      streams: sorted,
-      browserOk: sorted.some(canPlay),
+      streams: [...chStreams].sort((a, b) => streamScore(a) - streamScore(b)),
     })
   }
   // Os diretos oficiais aparecem primeiro; o resto por ordem alfabética
@@ -129,14 +116,12 @@ export async function loadCatalog() {
 
 // Um único estado por canal, para mostrar na lista
 export function channelStatus(channel) {
+  if (channel.subscription) return { kind: 'neutral', text: 'Assinatura' }
   if (channel.youtube) return null
-  if (!channel.browserOk) return { kind: 'neutral', text: 'Só HTTP' }
-  const best = playableStreams(channel)[0]
-  if (best?.labels?.includes('Geo-blocked')) return { kind: 'warning', text: 'Geo-bloqueado' }
-  if (best?.labels?.includes('Not 24/7')) return { kind: 'neutral', text: 'Não 24/7' }
+  if (channel.streams[0]?.labels?.includes('Not 24/7')) return { kind: 'neutral', text: 'Não 24/7' }
   return null
 }
 
 export function playableStreams(channel) {
-  return channel.streams.filter(canPlay)
+  return channel.streams
 }

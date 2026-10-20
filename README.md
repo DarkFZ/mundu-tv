@@ -1,6 +1,24 @@
 # Mundu TV — webapp IPTV
 
-Webapp em React + Vite + hls.js que lista e reproduz os canais **públicos** do projeto [iptv-org](https://github.com/iptv-org/iptv).
+Webapp em React + Vite + hls.js que lista e reproduz canais com **transmissão aberta** na internet, a partir do projeto [iptv-org](https://github.com/iptv-org/iptv).
+
+## Legalidade
+
+O Mundu TV é um guia, não um distribuidor. As regras estão em `src/api.js` (`isLegalStream`) e o aviso para o público em `public/legal.html` (link no rodapé da app).
+
+- **Não retransmite:** não há proxy nem servidor pelo meio. O browser (ou a TV, ao projetar) liga-se diretamente ao servidor do canal.
+- **Só streams diretos e abertos:** HTTPS, sem Referer/User-Agent falsificados e sem geo-bloqueio. Os streams que precisavam disto ficam de fora.
+- **Respeita remoções:** a lista de bloqueio do iptv-org (pedidos DMCA) e os pedidos feitos ao Mundu TV, em `src/legal.js`.
+- **Canais pagos só como atalho:** SPORT TV e SporTV aparecem com o selo "Assinatura" e abrem o serviço oficial. Nunca se toca o sinal na app.
+- **Sem gravação nem descargas.**
+
+### Pedidos de remoção
+
+1. O titular abre uma issue com a etiqueta `remoção` (link no rodapé da app e no aviso legal).
+2. Junta o id do canal a `REMOVED_CHANNELS` em `src/legal.js` e publica. O canal sai da lista.
+3. Responde na issue e fecha-a.
+
+Cria a etiqueta `remoção` no GitHub (*Issues → Labels*) para o link já a trazer preenchida.
 
 ## Correr localmente
 
@@ -33,23 +51,16 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 ## Como funciona
 
 - `src/api.js` carrega `channels`, `streams`, `countries`, `categories`, `logos` e `blocklist` de `https://iptv-org.github.io/api/`.
-  - Remove canais NSFW, encerrados ou bloqueados (DMCA).
+  - Remove canais NSFW, encerrados, bloqueados (DMCA) e os de `src/legal.js`.
+  - Só aceita streams que cumprem as regras da secção "Legalidade".
   - Mostra os nomes de países e categorias em português (`src/labels.js`).
-  - Ordena os streams de cada canal: primeiro HTTPS, sem headers especiais, sem geo-bloqueio.
-- `api/proxy.js` (Vercel Function) resolve dois problemas do browser:
-  - **HTTP num site HTTPS:** o browser bloqueia streams `http://`. O proxy vai buscá-los no servidor e devolve-os por HTTPS.
-  - **Referrer / User-Agent:** envia os headers que alguns canais exigem e que o browser não deixa definir.
-  - As playlists `.m3u8` são reescritas para que sub-playlists, segmentos, chaves e `EXT-X-MAP` passem também pelo proxy. Os segmentos HTTPS de canais sem headers continuam diretos.
-  - Recusa endereços internos (localhost, redes privadas) e conteúdo que não seja vídeo/áudio.
-  - Liga-se sozinho no site publicado. `VITE_PROXY=off` desliga; `VITE_PROXY=<url>` usa outro proxy (por exemplo, em `npm run dev`, que não corre a pasta `api/`; para testar tudo localmente usa `vercel dev`).
 - `Player.jsx` usa hls.js (ou HLS nativo no Safari/iOS). Se um stream falhar ou não arrancar em 15 s, tenta o seguinte automaticamente.
 - Favoritos e canais vistos recentemente ficam guardados no browser.
 
 ## Limitações conhecidas
 
-- **Geo-bloqueio pelo proxy:** os streams que passam pelo proxy saem dos servidores da Vercel, não da tua rede. Um canal geo-bloqueado pode funcionar ou não conforme a região da função.
-- **Tráfego:** cada canal pelo proxy gasta transferência da Vercel (o plano Hobby tem um limite mensal). Os streams HTTPS continuam diretos e não gastam nada.
-- **Geo-bloqueio e canais offline:** são comuns. A app salta para o próximo stream, mas alguns canais não funcionam de todo.
+- **Menos canais:** os que só tinham stream HTTP, com headers especiais ou geo-bloqueado já não aparecem. É o preço de não retransmitir nem contornar proteções.
+- **Canais offline:** são comuns. A app salta para o próximo stream, mas alguns canais não funcionam de todo.
 
 ## Próximos passos
 
@@ -58,7 +69,9 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 
 ## Canais com direto oficial
 
-Canais que não têm stream a funcionar no iptv-org mas transmitem em direto oficialmente no YouTube estão em `src/extra.js`, e aparecem primeiro no seu país. Hoje: **TCV**, pelo canal oficial da RTC (@rtc.caboverde). Tocam no leitor do YouTube e não podem ser gravados.
+Canais que não têm stream a funcionar no iptv-org mas transmitem em direto oficialmente no YouTube estão em `src/extra.js`, e aparecem primeiro no seu país. Hoje: **TCV**, pelo canal oficial da RTC (@rtc.caboverde). Tocam no leitor oficial do YouTube.
+
+O mesmo ficheiro tem os atalhos para canais pagos (`subscription`): mostram o selo "Assinatura" e um botão para o serviço oficial.
 
 ## Programação (EPG)
 
@@ -74,17 +87,5 @@ O botão de projetar aparece no player quando há como enviar o canal para a TV 
 
 - **Chromecast / Google TV / Android TV:** no Chrome (Android ou PC), pelo Google Cast. A TV vai buscar o stream sozinha; o telemóvel pausa e pode até bloquear o ecrã. Mudar de canal com a TV ligada envia logo o novo canal.
 - **AirPlay:** no Safari (iPhone, iPad, Mac), pelo seletor nativo. O botão só aparece se houver uma Apple TV ou TV compatível na rede.
-- Canais que passam pelo proxy funcionam na TV (o URL enviado é o do proxy, HTTPS).
 - Streams MPEG-TS contínuos e canais do YouTube não usam este botão (o leitor do YouTube tem o seu próprio).
 - Smart TVs sem Chromecast nem AirPlay (Miracast, "Smart View") só por espelhamento do ecrã, nas definições do telemóvel.
-
-## Gravação
-
-O botão **● Gravar** no player guarda o programa que estás a ver.
-
-- Os segmentos HLS são copiados tal como chegam, sem recompressão: mesma qualidade e pouco CPU.
-- Ao carregar em **■ Parar**, o ficheiro é descarregado (`.ts`, ou `.mp4` em streams fMP4). Abre no VLC.
-- Mudar de canal ou fechar o player também guarda o que já foi gravado.
-- A qualidade fica fixa durante a gravação. Limite de 2 GB, porque a gravação fica em memória até parar.
-- Não funciona no iPhone/iPad (o Safari usa HLS nativo) nem em streams encriptados.
-- Só grava enquanto a página está aberta. Para uso pessoal; não redistribuas o conteúdo.
