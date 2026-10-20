@@ -145,8 +145,12 @@ async function handle(request) {
     const v = upstream.headers.get(h)
     if (v) out.set(h, v)
   }
-  // Segmentos não mudam: um pouco de cache no CDN poupa pedidos repetidos
-  out.set('Cache-Control', 'public, max-age=0, s-maxage=30')
+  // Segmentos (têm tamanho) não mudam: um pouco de cache no CDN poupa pedidos.
+  // Um stream contínuo (MPEG-TS sem tamanho) nunca pode ir para cache.
+  out.set(
+    'Cache-Control',
+    upstream.headers.get('content-length') ? 'public, max-age=0, s-maxage=30' : 'no-store'
+  )
   return new Response(upstream.body, { status: upstream.status, headers: out })
 }
 

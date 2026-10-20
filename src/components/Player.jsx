@@ -120,10 +120,14 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
   const streams = playableStreams(channel)
   const [index, setIndex] = useState(0)
   const [status, setStatus] = useState('loading') // loading | playing | failed
+  // Formato do stream atual: HLS (.m3u8) ou MPEG-TS contínuo (ex.: /play/a02z)
+  const [format, setFormat] = useState('hls')
+  const [reconnect, setReconnect] = useState(0) // nova ligação ao mesmo stream
   const [rec, setRec] = useState(null) // { seconds, bytes } para a interface
   const [recError, setRecError] = useState(null)
 
-  const canRecord = Hls.isSupported() // no iOS o HLS é nativo e não deixa ler os segmentos
+  // No iOS o HLS é nativo e não deixa ler os segmentos; MPEG-TS também não grava
+  const canRecord = Hls.isSupported() && format === 'hls'
 
   // Termina a gravação e descarrega o ficheiro
   const stopRecording = useCallback(async () => {
@@ -182,10 +186,18 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
     setStatus('loading')
 
     let hls
+    let ts
     let timeout
-    const next = () => setIndex((i) => i + 1) // tenta o stream seguinte
+    let started = false
+    let disposed = false
+    // tenta o stream seguinte
+    const next = () => {
+      setFormat('hls')
+      setIndex((i) => i + 1)
+    }
     const onPlaying = () => {
       clearTimeout(timeout)
+      started = true
       setStatus('playing')
     }
     const onFirstPlay = () => onPlayingRef.current?.(channel.id)
@@ -195,17 +207,42 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
     video.addEventListener('playing', onPlaying)
     video.addEventListener('playing', onFirstPlay, { once: true })
 
-    if (Hls.isSupported()) {
+    if (format === 'ts') {
+      // MPEG-TS contínuo (comum em servidores Astra): toca com mpegts.js
+      import('mpegts.js').then(({ default: mpegts }) => {
+        if (disposed) return
+        if (!mpegts.getFeatureList().mseLivePlayback) {
+          clearTimeout(timeout)
+          next()
+          return
+        }
+        ts = mpegts.createPlayer(
+          { type: 'mpegts', isLive: true, url: new URL(streamUrl(stream), location.href).href },
+          { enableWorker: true, liveBufferLatencyChasing: true, lazyLoad: false }
+        )
+        ts.attachMediaElement(video)
+        ts.load()
+        Promise.resolve(ts.play()).catch(() => {})
+        ts.on(mpegts.Events.ERROR, () => {
+          clearTimeout(timeout)
+          // Se já estava a tocar, a ligação caiu (o proxy corta ao fim de alguns
+          // minutos): liga outra vez ao mesmo stream. Senão, passa ao seguinte.
+          if (started) setReconnect((n) => n + 1)
+          else next()
+        })
+      })
+    } else if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false })
       hlsRef.current = hls
       hls.loadSource(streamUrl(stream))
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}))
       hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) {
-          clearTimeout(timeout)
-          next()
-        }
+        if (!data.fatal) return
+        clearTimeout(timeout)
+        // A resposta não era uma playlist: pode ser MPEG-TS contínuo
+        if (data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR) setFormat('ts')
+        else next()
       })
 
       // Gravação: copia cada segmento de vídeo tal como chega (sem recomprimir)
@@ -245,13 +282,20 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
       video.removeEventListener('playing', onPlaying)
       video.removeEventListener('playing', onFirstPlay)
       video.onerror = null
+      disposed = true
       hls?.destroy()
       hlsRef.current = null
+      if (ts) {
+        ts.pause()
+        ts.unload()
+        ts.detachMediaElement()
+        ts.destroy()
+      }
       video.removeAttribute('src')
       video.load()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel.id, index])
+  }, [channel.id, index, format, reconnect])
 
   const stream = streams[index]
   const meta = [channel.categories[0] && categoryName(channel.categories[0]), countryLabel, stream?.quality]
@@ -284,7 +328,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
                 : `Tentámos ${streams.length === 1 ? 'o único stream' : `os ${streams.length} streams`}. Pode estar offline ou bloqueado na tua região.`}
             </span>
             {streams.length > 0 && (
-              <button className="btn btn-secondary" onClick={() => setIndex(0)}>
+              <button className="btn btn-secondary" onClick={() => { setFormat('hls'); setIndex(0) }}>
                 <RotateCcw size={16} strokeWidth={1.75} /> Tentar outra vez
               </button>
             )}
