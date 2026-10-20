@@ -5,6 +5,8 @@
 // ex.: 'RTP1.pt'). O canal deixa de aparecer na próxima publicação.
 export const REMOVED_CHANNELS = [
   // { id: 'Exemplo.pt', date: '2026-10-20', issue: 12 },
+  // Retirados pelo Mundu TV: passam desenhos animados de terceiros sem sinal de terem direitos
+  { id: 'RetroCartoon.br', date: '2026-10-20', reason: 'desenhos de terceiros sem licença aparente' },
 ]
 
 // Onde os titulares de direitos pedem a remoção de um canal
@@ -37,6 +39,7 @@ export const BLOCKED_HOSTS = [
   'iptvnetwork.net',
   'anixa.tv',
   'televizor-24-tochka.ru',
+  'bozztv.com',
   // Agregadores que copiam o sinal de outros canais
   'aynaott.com',
   'aynascope.net',
