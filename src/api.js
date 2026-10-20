@@ -1,135 +1,49 @@
-// Dados públicos do projeto iptv-org (https://github.com/iptv-org/api)
+// Catálogo de canais. Vem já filtrado e compacto do servidor (api/catalog.js);
+// se esse endpoint não existir (ex.: `npm run dev`), monta-o aqui a partir do iptv-org.
 import { countryName, categoryName } from './labels.js'
-import { EXTRA_CHANNELS } from './extra.js'
-import { BLOCKED_HOSTS, PAID_BRANDS, REMOVED_CHANNELS, TRUSTED_HOSTS, hostMatches } from './legal.js'
+import { IPTV_ORG_API, fetchAndBuildCatalog, streamHeight } from './catalog-core.js'
+import { isSlowConnection, maxHeightForConnection } from './network.js'
 
-const BASE = import.meta.env.VITE_API_BASE || 'https://iptv-org.github.io/api'
+export { isLegalStream } from './catalog-core.js'
 
-async function getJSON(name) {
-  const res = await fetch(`${BASE}/${name}.json`)
-  if (!res.ok) throw new Error(`Falha ao carregar ${name}.json (${res.status})`)
-  return res.json()
-}
-
-// Regras de legalidade (ver README, secção "Legalidade"):
-// - O Mundu TV não retransmite nada: o browser liga-se diretamente ao servidor
-//   do canal. Não há proxy, por isso só servem streams HTTPS.
-// - Não finge ser outro site nem outro programa: streams que exigem Referer ou
-//   User-Agent especiais (proteção contra uso fora do site do canal) ficam de fora.
-// - Não contorna restrições de região: streams marcados como geo-bloqueados ficam de fora.
-// - Não usa retransmissões: servidores de pirataria, agregadores e operadoras
-//   (BLOCKED_HOSTS em legal.js) ficam de fora.
-function hostOf(url) {
-  try {
-    return new URL(url).hostname.toLowerCase()
-  } catch {
-    return ''
-  }
-}
-
-export function isLegalStream(s) {
-  const host = hostOf(s.url)
-  return (
-    s.url.startsWith('https:') &&
-    host !== '' &&
-    !hostMatches(host, BLOCKED_HOSTS) &&
-    !s.referrer &&
-    !s.user_agent &&
-    !s.labels?.includes('Geo-blocked')
-  )
-}
-
-// Canais pagos só entram pelos serviços oficiais gratuitos (ex.: Nick Jr. da Pluto TV)
-function legalStreamsFor(channel, streams) {
-  if (!PAID_BRANDS.test(channel.name)) return streams
-  return streams.filter((s) => hostMatches(hostOf(s.url), TRUSTED_HOSTS))
-}
+// VITE_API_BASE aponta para outra cópia da API do iptv-org (e salta o endpoint)
+const API_BASE = import.meta.env.VITE_API_BASE
+const CATALOG_URL = import.meta.env.VITE_CATALOG_URL || '/api/catalog'
 
 // O URL que o player usa é sempre o original do canal
 export function streamUrl(s) {
   return s.url
 }
 
-// Ordena streams do mais provável de funcionar para o menos provável
-function streamScore(s) {
-  let score = 0
-  if (!s.labels?.includes('Not 24/7')) score += 10
-  score += parseInt(s.quality) / 100 || 0
-  return -score
+async function fetchCompactCatalog() {
+  const res = await fetch(CATALOG_URL)
+  const type = res.headers.get('content-type') || ''
+  if (!res.ok || !type.includes('json')) throw new Error(`Catálogo indisponível (${res.status})`)
+  return res.json()
 }
 
 export async function loadCatalog() {
-  const [channels, streams, countries, categories, logos, blocklist] =
-    await Promise.all([
-      getJSON('channels'),
-      getJSON('streams'),
-      getJSON('countries'),
-      getJSON('categories'),
-      getJSON('logos'),
-      getJSON('blocklist'),
-    ])
-
-  // Bloqueados pelo iptv-org (pedidos DMCA, NSFW) e pedidos de remoção feitos ao Mundu TV
-  const blocked = new Set([...blocklist.map((b) => b.channel), ...REMOVED_CHANNELS.map((r) => r.id)])
-
-  // Agrupa os streams legais por canal
-  const streamsByChannel = new Map()
-  for (const s of streams) {
-    if (!s.channel || !isLegalStream(s)) continue
-    if (!streamsByChannel.has(s.channel)) streamsByChannel.set(s.channel, [])
-    streamsByChannel.get(s.channel).push(s)
+  let raw
+  if (API_BASE) raw = await fetchAndBuildCatalog(API_BASE)
+  else {
+    try {
+      raw = await fetchCompactCatalog()
+    } catch {
+      raw = await fetchAndBuildCatalog(IPTV_ORG_API) // muito mais pesado, só como recurso
+    }
   }
 
-  // Escolhe um logótipo por canal (preferência: o principal, em uso)
-  const logoByChannel = new Map()
-  for (const l of logos) {
-    const current = logoByChannel.get(l.channel)
-    const better = !current || (!l.feed && current.feed) || (l.in_use && !current.in_use)
-    if (better) logoByChannel.set(l.channel, l)
-  }
-
-  const extraIds = new Set(EXTRA_CHANNELS.map((c) => c.id))
-  const list = EXTRA_CHANNELS.filter((c) => !blocked.has(c.id)).map((c) => ({
-    ...c,
-    logo: logoByChannel.get(c.id)?.url || c.logo || null,
-    streams: [],
-    featured: !c.subscription,
-  }))
-  for (const c of channels) {
-    if (c.is_nsfw || c.closed || blocked.has(c.id) || extraIds.has(c.id)) continue
-    const chStreams = legalStreamsFor(c, streamsByChannel.get(c.id) || [])
-    if (!chStreams.length) continue
-    list.push({
-      id: c.id,
-      name: c.name,
-      country: c.country,
-      categories: c.categories || [],
-      website: c.website,
-      logo: logoByChannel.get(c.id)?.url || null,
-      streams: [...chStreams].sort((a, b) => streamScore(a) - streamScore(b)),
-    })
-  }
-  // Os diretos oficiais aparecem primeiro; o resto por ordem alfabética
-  list.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || a.name.localeCompare(b.name))
-
-  // Só países/categorias que têm canais, com nomes em português
+  // Nomes em português e contagens por país
   const countByCountry = new Map()
-  for (const c of list) countByCountry.set(c.country, (countByCountry.get(c.country) || 0) + 1)
-  const usedCategories = new Set(list.flatMap((c) => c.categories))
+  for (const c of raw.channels) countByCountry.set(c.country, (countByCountry.get(c.country) || 0) + 1)
 
   return {
-    channels: list,
-    countries: countries
+    channels: raw.channels,
+    countries: raw.countries
       .filter((c) => countByCountry.has(c.code))
-      .map((c) => ({
-        code: c.code,
-        name: countryName(c.code, c.name),
-        count: countByCountry.get(c.code),
-      }))
+      .map((c) => ({ code: c.code, name: countryName(c.code, c.name), count: countByCountry.get(c.code) }))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt')),
-    categories: categories
-      .filter((c) => usedCategories.has(c.id))
-      .map((c) => ({ id: c.id, name: categoryName(c.id, c.name) })),
+    categories: raw.categories.map((c) => ({ id: c.id, name: categoryName(c.id, c.name) })),
   }
 }
 
@@ -141,6 +55,13 @@ export function channelStatus(channel) {
   return null
 }
 
+// Streams pela ordem a tentar. Com internet lenta (ou "Poupar dados"), os de
+// resolução mais baixa passam à frente: arrancam mais depressa e param menos.
 export function playableStreams(channel) {
-  return channel.streams
+  const max = maxHeightForConnection()
+  if (!max || channel.streams.length < 2) return channel.streams
+  const fits = (s) => streamHeight(s) > 0 && streamHeight(s) <= max
+  return [...channel.streams.filter(fits), ...channel.streams.filter((s) => !fits(s))]
 }
+
+export { isSlowConnection }
