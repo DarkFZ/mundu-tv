@@ -1,7 +1,7 @@
 // Dados públicos do projeto iptv-org (https://github.com/iptv-org/api)
 import { countryName, categoryName } from './labels.js'
 import { EXTRA_CHANNELS } from './extra.js'
-import { REMOVED_CHANNELS } from './legal.js'
+import { BLOCKED_HOSTS, PAID_BRANDS, REMOVED_CHANNELS, TRUSTED_HOSTS, hostMatches } from './legal.js'
 
 const BASE = import.meta.env.VITE_API_BASE || 'https://iptv-org.github.io/api'
 
@@ -17,13 +17,32 @@ async function getJSON(name) {
 // - Não finge ser outro site nem outro programa: streams que exigem Referer ou
 //   User-Agent especiais (proteção contra uso fora do site do canal) ficam de fora.
 // - Não contorna restrições de região: streams marcados como geo-bloqueados ficam de fora.
+// - Não usa retransmissões: servidores de pirataria, agregadores e operadoras
+//   (BLOCKED_HOSTS em legal.js) ficam de fora.
+function hostOf(url) {
+  try {
+    return new URL(url).hostname.toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
 export function isLegalStream(s) {
+  const host = hostOf(s.url)
   return (
     s.url.startsWith('https:') &&
+    host !== '' &&
+    !hostMatches(host, BLOCKED_HOSTS) &&
     !s.referrer &&
     !s.user_agent &&
     !s.labels?.includes('Geo-blocked')
   )
+}
+
+// Canais pagos só entram pelos serviços oficiais gratuitos (ex.: Nick Jr. da Pluto TV)
+function legalStreamsFor(channel, streams) {
+  if (!PAID_BRANDS.test(channel.name)) return streams
+  return streams.filter((s) => hostMatches(hostOf(s.url), TRUSTED_HOSTS))
 }
 
 // O URL que o player usa é sempre o original do canal
@@ -78,8 +97,8 @@ export async function loadCatalog() {
   }))
   for (const c of channels) {
     if (c.is_nsfw || c.closed || blocked.has(c.id) || extraIds.has(c.id)) continue
-    const chStreams = streamsByChannel.get(c.id)
-    if (!chStreams?.length) continue
+    const chStreams = legalStreamsFor(c, streamsByChannel.get(c.id) || [])
+    if (!chStreams.length) continue
     list.push({
       id: c.id,
       name: c.name,
