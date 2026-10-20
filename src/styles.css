@@ -130,3 +130,26 @@ a { color: var(--accent); }
   .card-logo { height: 56px; }
   .topbar h1 { font-size: 1.05rem; }
 }
+
+/* Gravação */
+.rec-btn {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  height: 40px; padding: 0 12px; border-radius: 10px; font-size: .85rem; cursor: pointer;
+  flex-shrink: 0; white-space: nowrap;
+}
+.rec-btn:not(:disabled):hover { border-color: #ff3b3b; }
+.rec-btn:disabled { opacity: .4; cursor: not-allowed; }
+.rec-on { background: #ff3b3b; border-color: #ff3b3b; color: #fff; }
+.rec-badge {
+  position: absolute; top: 10px; left: 10px; display: flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,.65); color: #fff; font-size: .8rem; font-weight: 600;
+  padding: 4px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff3b3b; animation: pulse 1s infinite; }
+.rec-error { margin: 0; padding: 0 14px 12px; color: var(--warn); font-size: .85rem; cursor: pointer; }
+
+@media (max-width: 720px) {
+  .player-info { flex-wrap: wrap; }
+  .player-text { flex-basis: calc(100% - 60px); }
+  .rec-btn { flex: 1; }
+}

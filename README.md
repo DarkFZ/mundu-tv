@@ -39,3 +39,14 @@ Na Vercel: importa o repositório. O preset "Vite" é detetado automaticamente.
 - PWA (instalar no telemóvel / Smart TV)
 - Proxy em Node para streams HTTP
 - App Android com Capacitor
+
+## Gravação
+
+O botão **● Gravar** no player guarda o programa que estás a ver.
+
+- Os segmentos HLS são copiados tal como chegam, sem recompressão: mesma qualidade e pouco CPU.
+- Ao carregar em **■ Parar**, o ficheiro é descarregado (`.ts`, ou `.mp4` em streams fMP4). Abre no VLC.
+- Mudar de canal ou fechar o player também guarda o que já foi gravado.
+- A qualidade fica fixa durante a gravação. Limite de 2 GB, porque a gravação fica em memória até parar.
+- Não funciona no iPhone/iPad (o Safari usa HLS nativo) nem em streams encriptados.
+- Só grava enquanto a página está aberta. Para uso pessoal; não redistribuas o conteúdo.
