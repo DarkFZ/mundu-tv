@@ -42,15 +42,25 @@ function supportsAirPlay() {
 export function useCast(videoRef) {
   const [kind, setKind] = useState(supportsAirPlay() ? 'airplay' : null) // 'cast' | 'airplay' | null
   const [airplayFound, setAirplayFound] = useState(false)
+  const [airplayActive, setAirplayActive] = useState(false) // a tocar numa Apple TV
   const [connectedTo, setConnectedTo] = useState(null) // nome da TV com sessão Cast ativa
+  const [busy, setBusy] = useState(false) // a ligar ou a desligar a TV
 
   useEffect(() => {
     if (kind === 'airplay') return
     let alive = true
     let ctx
-    const onSession = () => {
-      const s = ctx.getCurrentSession()
-      setConnectedTo(s ? s.getCastDevice().friendlyName || 'TV' : null)
+    // O estado vem do evento, não de getCurrentSession(): durante "a terminar" a
+    // sessão ainda existe, e o botão ficava preso em "Parar de projetar"
+    const onSession = (e) => {
+      const S = window.cast.framework.SessionState
+      const state = e?.sessionState
+      setBusy(state === S.SESSION_STARTING || state === S.SESSION_ENDING)
+      const live = state
+        ? state === S.SESSION_STARTED || state === S.SESSION_RESUMED
+        : Boolean(ctx.getCurrentSession())
+      const session = live ? ctx.getCurrentSession() : null
+      setConnectedTo(session ? session.getCastDevice().friendlyName || 'TV' : null)
     }
     loadCast().then((ok) => {
       if (!alive || !ok) return
@@ -65,17 +75,24 @@ export function useCast(videoRef) {
     }
   }, [kind])
 
-  // No Safari, só mostra o botão quando há um recetor AirPlay na rede
+  // No Safari, só mostra o botão quando há um recetor AirPlay na rede, e sabe
+  // quando o vídeo está a tocar na Apple TV
   useEffect(() => {
     const video = videoRef.current
     if (kind !== 'airplay' || !video) return
     const onAvail = (e) => setAirplayFound(e.availability === 'available')
+    const onWireless = () => setAirplayActive(Boolean(video.webkitCurrentPlaybackTargetIsWireless))
     video.addEventListener('webkitplaybacktargetavailabilitychanged', onAvail)
-    return () => video.removeEventListener('webkitplaybacktargetavailabilitychanged', onAvail)
+    video.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', onWireless)
+    onWireless()
+    return () => {
+      video.removeEventListener('webkitplaybacktargetavailabilitychanged', onAvail)
+      video.removeEventListener('webkitcurrentplaybacktargetiswirelesschanged', onWireless)
+    }
   }, [kind, videoRef])
 
-  const available = kind === 'cast' || (kind === 'airplay' && airplayFound)
-  return { kind, available, connectedTo }
+  const available = kind === 'cast' || (kind === 'airplay' && (airplayFound || airplayActive))
+  return { kind, available, connectedTo, airplayActive, busy, setBusy }
 }
 
 // Envia o canal para a TV.
@@ -102,6 +119,11 @@ export async function castChannel({ kind, video, url, title, logo }) {
   await session.loadMedia(req)
 }
 
+// Desliga a TV (e fecha o player do Chromecast nela)
 export function stopCasting() {
-  window.cast?.framework.CastContext.getInstance().endCurrentSession(true)
+  try {
+    window.cast?.framework.CastContext.getInstance().endCurrentSession(true)
+  } catch {
+    /* a sessão já tinha terminado */
+  }
 }

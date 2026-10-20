@@ -189,16 +189,20 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
   const [reconnect, setReconnect] = useState(0) // nova ligação ao mesmo stream
   const [castError, setCastError] = useState(null) // mensagem de erro no rodapé
   const cast = useCast(videoRef)
-  const onTv = cast.kind === 'cast' && cast.connectedTo
+  // Chromecast: o vídeo toca na TV e o telemóvel fica parado.
+  // AirPlay: o próprio <video> é enviado para a Apple TV, por isso não se pára.
+  const onTv = Boolean(cast.kind === 'cast' && cast.connectedTo)
 
   // O recetor da TV só toca HLS; MPEG-TS contínuo fica no telemóvel
   const canCast = cast.available && format === 'hls' && status === 'playing'
 
   const castedRef = useRef(null) // URL que está na TV, para não o enviar duas vezes
   const projectToTv = async () => {
+    if (cast.busy) return // evita dois toques seguidos a abrir dois seletores
     setCastError(null)
     const stream = streams[index]
     castedRef.current = streamUrl(stream)
+    if (cast.kind === 'cast') cast.setBusy(true)
     try {
       await castChannel({
         kind: cast.kind,
@@ -211,21 +215,49 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
       castedRef.current = null
       if (e === 'cancel' || e?.code === 'cancel') return // fechou o seletor de TVs
       setCastError('Não foi possível projetar este canal na TV.')
+    } finally {
+      if (cast.kind === 'cast') cast.setBusy(false)
     }
   }
 
-  // Enquanto o canal está na TV, o telemóvel não gasta dados a tocá-lo também
+  const stopTv = () => {
+    if (cast.busy) return
+    cast.setBusy(true)
+    stopCasting()
+    setTimeout(() => cast.setBusy(false), 8000) // se a TV não responder, o botão não fica preso
+  }
+
+  // O botão alterna: liga se não há TV, desliga se há. No AirPlay abre sempre o
+  // seletor do Safari, que é onde se escolhe a Apple TV ou se volta ao iPhone.
+  const toggleTv = () => (onTv ? stopTv() : projectToTv())
+
+  // Enquanto o canal está na TV, o telemóvel pára o vídeo e deixa de o
+  // descarregar. Ao voltar, retoma no ponto do direto (e não onde parou, que
+  // num direto já não existe e fazia o player falhar ou saltar de stream).
+  const wasOnTvRef = useRef(false)
   useEffect(() => {
     const video = videoRef.current
+    const hls = hlsRef.current
     if (!video) return
-    if (!onTv) {
-      if (status === 'playing') video.play().catch(() => {})
-      return
+    if (onTv) {
+      wasOnTvRef.current = true
+      hls?.stopLoad()
+      video.pause()
+      const keepPaused = () => video.pause()
+      video.addEventListener('playing', keepPaused)
+      return () => video.removeEventListener('playing', keepPaused)
     }
-    video.pause()
-    const keepPaused = () => video.pause()
-    video.addEventListener('playing', keepPaused)
-    return () => video.removeEventListener('playing', keepPaused)
+    if (!wasOnTvRef.current) return
+    wasOnTvRef.current = false
+    if (hls) {
+      hls.startLoad(-1)
+      const live = hls.levels?.[Math.max(hls.currentLevel, 0)]?.details?.live
+      const edge = hls.liveSyncPosition
+      if (live && Number.isFinite(edge)) video.currentTime = edge
+      video.play().catch(() => {})
+    } else {
+      setReconnect((n) => n + 1) // Safari / MPEG-TS: liga outra vez ao stream
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onTv])
 
@@ -328,7 +360,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         if (!started) armTimeout()
       })
       hls.on(Hls.Events.ERROR, (_, data) => {
-        if (!data.fatal) return
+        if (!data.fatal || wasOnTvRef.current) return // com a TV ligada, o telemóvel está parado
         clearTimeout(timeout)
         // A resposta não era uma playlist: pode ser MPEG-TS contínuo
         if (data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR) setFormat('ts')
@@ -420,8 +452,8 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
           <div className="screen-overlay">
             <Cast size={22} strokeWidth={1.75} />
             <strong>A ver na {cast.connectedTo}</strong>
-            <button className="btn btn-secondary" onClick={stopCasting}>
-              Parar de projetar
+            <button className="btn btn-secondary" onClick={stopTv} disabled={cast.busy}>
+              {cast.busy ? 'A desligar…' : 'Parar de projetar'}
             </button>
           </div>
         )}
@@ -464,12 +496,23 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         <div className="stage-actions">
           {cast.available && (
             <button
-              className={`icon-btn ${onTv ? 'is-on' : ''}`}
-              onClick={onTv ? stopCasting : projectToTv}
-              disabled={!onTv && !canCast}
-              aria-label={onTv ? 'Parar de projetar' : 'Projetar na TV'}
+              className={`icon-btn ${onTv || cast.airplayActive ? 'is-on' : ''}`}
+              onClick={toggleTv}
+              disabled={cast.busy || (!onTv && !cast.airplayActive && !canCast)}
+              aria-label={
+                cast.kind === 'airplay'
+                  ? cast.airplayActive
+                    ? 'A ver na Apple TV (escolher outro aparelho)'
+                    : 'Projetar com AirPlay'
+                  : onTv
+                    ? 'Parar de projetar'
+                    : 'Projetar na TV'
+              }
+              aria-pressed={onTv || cast.airplayActive}
               title={
-                format !== 'hls'
+                cast.busy
+                  ? 'A ligar à TV…'
+                  : format !== 'hls'
                   ? 'Este stream não pode ser projetado na TV'
                   : status !== 'playing' && !onTv
                     ? 'Espera que o canal comece a tocar'
