@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
+import { Circle, ExternalLink, Loader2, RotateCcw, Square, Star, X } from 'lucide-react'
 import { playableStreams } from '../api.js'
+import { categoryName, labelName } from '../labels.js'
+import { Logo } from './ChannelRow.jsx'
 
 const MAX_BYTES = 2 * 1024 ** 3 // pára sozinho aos 2 GB para não esgotar a memória
 
@@ -38,9 +41,11 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
-export default function Player({ channel, onClose, isFav, onToggleFav }) {
+export default function Player({ channel, countryLabel, onClose, isFav, onToggleFav, onPlaying }) {
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
+  const onPlayingRef = useRef(onPlaying)
+  onPlayingRef.current = onPlaying
   const recRef = useRef(null) // gravação em curso: { chunks, bytes, start, ext, initPromise }
   const streams = playableStreams(channel)
   const [index, setIndex] = useState(0)
@@ -113,10 +118,12 @@ export default function Player({ channel, onClose, isFav, onToggleFav }) {
       clearTimeout(timeout)
       setStatus('playing')
     }
+    const onFirstPlay = () => onPlayingRef.current?.(channel.id)
 
     // Se em 15s não arrancar, passa ao próximo stream
     timeout = setTimeout(next, 15000)
     video.addEventListener('playing', onPlaying)
+    video.addEventListener('playing', onFirstPlay, { once: true })
 
     if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false })
@@ -166,6 +173,7 @@ export default function Player({ channel, onClose, isFav, onToggleFav }) {
       clearTimeout(timeout)
       stopRecording() // ao mudar de canal ou fechar, guarda o que já foi gravado
       video.removeEventListener('playing', onPlaying)
+      video.removeEventListener('playing', onFirstPlay)
       video.onerror = null
       hls?.destroy()
       hlsRef.current = null
@@ -176,88 +184,116 @@ export default function Player({ channel, onClose, isFav, onToggleFav }) {
   }, [channel.id, index])
 
   const stream = streams[index]
+  const meta = [channel.categories[0] && categoryName(channel.categories[0]), countryLabel, stream?.quality]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
-    <section className="player">
-      <div className="player-video">
+    <section className="stage-card" aria-label={`A ver ${channel.name}`}>
+      <div className="screen">
         <video ref={videoRef} controls playsInline autoPlay />
         {rec && (
-          <div className="rec-badge">
+          <div className="rec-badge num" aria-live="polite">
             <span className="rec-dot" /> REC {formatTime(rec.seconds)} · {formatSize(rec.bytes)}
           </div>
         )}
         {status === 'loading' && stream && (
-          <div className="player-overlay">
-            <div className="spinner" />
+          <div className="screen-overlay">
+            <Loader2 size={22} className="spin" />
             <span>
-              A ligar… stream {index + 1} de {streams.length}
+              A ligar ao stream {index + 1} de {streams.length}
             </span>
           </div>
         )}
         {status === 'failed' && (
-          <div className="player-overlay">
-            <strong>Canal indisponível</strong>
+          <div className="screen-overlay">
+            <strong>Este canal não está a responder</strong>
             <span>
               {streams.length === 0
-                ? 'Este canal só tem streams HTTP, que o browser bloqueia num site HTTPS.'
-                : 'Nenhum dos streams respondeu. Pode estar offline ou bloqueado na tua região.'}
+                ? 'Só tem streams HTTP, que o browser bloqueia num site seguro.'
+                : `Tentámos ${streams.length === 1 ? 'o único stream' : `os ${streams.length} streams`}. Pode estar offline ou bloqueado na tua região.`}
             </span>
             {streams.length > 0 && (
-              <button className="btn" onClick={() => setIndex(0)}>
-                Tentar de novo
+              <button className="btn btn-secondary" onClick={() => setIndex(0)}>
+                <RotateCcw size={16} strokeWidth={1.75} /> Tentar outra vez
               </button>
             )}
           </div>
         )}
       </div>
 
-      <div className="player-info">
-        {channel.logo && <img src={channel.logo} alt="" className="player-logo" />}
-        <div className="player-text">
+      <div className="stage-head">
+        <Logo channel={channel} size={48} />
+        <div className="stage-title">
           <h2>{channel.name}</h2>
-          <p>
-            {stream?.quality && <span className="tag">{stream.quality}</span>}
-            {stream?.labels?.map((l) => (
-              <span key={l} className="tag tag-warn">
-                {l === 'Geo-blocked' ? 'Geo-bloqueado' : l === 'Not 24/7' ? 'Não 24/7' : l}
-              </span>
-            ))}
-            {channel.website && (
-              <a href={channel.website} target="_blank" rel="noreferrer">
-                Site oficial
-              </a>
-            )}
-          </p>
+          <p className="stage-meta">{meta}</p>
         </div>
-        <button
-          className={`rec-btn ${rec ? 'rec-on' : ''}`}
-          onClick={rec ? stopRecording : startRecording}
-          disabled={!canRecord || status !== 'playing'}
-          title={
-            !canRecord
-              ? 'Gravação não suportada neste browser (iPhone/iPad)'
-              : rec
-                ? 'Parar e guardar'
-                : 'Gravar'
-          }
-        >
-          {rec ? '■ Parar' : '● Gravar'}
-        </button>
-        <button
-          className={`icon-btn ${isFav ? 'fav-on' : ''}`}
-          onClick={onToggleFav}
-          aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-        >
-          {isFav ? '★' : '☆'}
-        </button>
-        <button className="icon-btn" onClick={onClose} aria-label="Fechar">
-          ✕
-        </button>
+        <div className="stage-actions">
+          <button
+            className={`btn ${rec ? 'btn-rec' : 'btn-primary'}`}
+            onClick={rec ? stopRecording : startRecording}
+            disabled={!canRecord || status !== 'playing'}
+            title={
+              !canRecord
+                ? 'O Safari do iPhone e do iPad não deixa gravar'
+                : status !== 'playing'
+                  ? 'Espera que o canal comece a tocar'
+                  : undefined
+            }
+          >
+            {rec ? (
+              <>
+                <Square size={14} strokeWidth={0} fill="currentColor" /> Parar
+              </>
+            ) : (
+              <>
+                <Circle size={12} strokeWidth={0} fill="var(--rec)" /> Gravar
+              </>
+            )}
+          </button>
+          <button
+            className={`icon-btn ${isFav ? 'is-on' : ''}`}
+            onClick={onToggleFav}
+            aria-label={isFav ? 'Tirar dos favoritos' : 'Guardar nos favoritos'}
+            aria-pressed={isFav}
+          >
+            <Star size={18} strokeWidth={1.75} fill={isFav ? 'currentColor' : 'none'} />
+          </button>
+          {channel.website && (
+            <a
+              className="icon-btn stage-link"
+              href={channel.website}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Abrir o site do canal"
+            >
+              <ExternalLink size={18} strokeWidth={1.75} />
+            </a>
+          )}
+          <button className="icon-btn" onClick={onClose} aria-label="Fechar o player">
+            <X size={18} strokeWidth={1.75} />
+          </button>
+        </div>
       </div>
-      {recError && (
-        <p className="rec-error" onClick={() => setRecError(null)}>
-          {recError}
-        </p>
+
+      {(stream?.labels?.length > 0 || streams.length > 1 || recError) && (
+        <div className="stage-foot">
+          {streams.length > 1 && (
+            <span className="num">
+              Stream {Math.min(index + 1, streams.length)} de {streams.length}
+            </span>
+          )}
+          {stream?.labels?.map((l) => (
+            <span key={l} className={`pill ${l === 'Geo-blocked' ? 'pill-warning' : 'pill-neutral'}`}>
+              {labelName(l)}
+            </span>
+          ))}
+          {recError && (
+            <button className="stage-error" onClick={() => setRecError(null)}>
+              {recError}
+            </button>
+          )}
+        </div>
       )}
     </section>
   )

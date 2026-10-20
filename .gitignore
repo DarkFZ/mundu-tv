@@ -1,3 +1,7 @@
 node_modules
 dist
 .DS_Store
+.taste-skill/inspect
+.taste-skill/before
+.taste-skill/after
+.impeccable/

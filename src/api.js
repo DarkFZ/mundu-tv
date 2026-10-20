@@ -1,5 +1,7 @@
 // Dados públicos do projeto iptv-org (https://github.com/iptv-org/api)
-const BASE = 'https://iptv-org.github.io/api'
+import { countryName, categoryName } from './labels.js'
+
+const BASE = import.meta.env.VITE_API_BASE || 'https://iptv-org.github.io/api'
 
 async function getJSON(name) {
   const res = await fetch(`${BASE}/${name}.json`)
@@ -70,19 +72,34 @@ export async function loadCatalog() {
   }
   list.sort((a, b) => a.name.localeCompare(b.name))
 
-  // Só países/categorias que têm canais
-  const usedCountries = new Set(list.map((c) => c.country))
+  // Só países/categorias que têm canais, com nomes em português
+  const countByCountry = new Map()
+  for (const c of list) countByCountry.set(c.country, (countByCountry.get(c.country) || 0) + 1)
   const usedCategories = new Set(list.flatMap((c) => c.categories))
 
   return {
     channels: list,
     countries: countries
-      .filter((c) => usedCountries.has(c.code))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+      .filter((c) => countByCountry.has(c.code))
+      .map((c) => ({
+        code: c.code,
+        name: countryName(c.code, c.name),
+        count: countByCountry.get(c.code),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt')),
     categories: categories
       .filter((c) => usedCategories.has(c.id))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+      .map((c) => ({ id: c.id, name: categoryName(c.id, c.name) })),
   }
+}
+
+// Um único estado por canal, para mostrar na lista
+export function channelStatus(channel) {
+  if (!channel.browserOk) return { kind: 'neutral', text: 'Só HTTP' }
+  const best = playableStreams(channel)[0]
+  if (best?.labels?.includes('Geo-blocked')) return { kind: 'warning', text: 'Geo-bloqueado' }
+  if (best?.labels?.includes('Not 24/7')) return { kind: 'neutral', text: 'Não 24/7' }
+  return null
 }
 
 export function playableStreams(channel) {

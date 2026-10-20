@@ -19,13 +19,18 @@ npm run build   # gera a pasta dist/
 
 Na Vercel: importa o repositório. O preset "Vite" é detetado automaticamente.
 
+## Design
+
+Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.claude/skills/` e ficam disponíveis em sessões do Claude Code neste repo.
+
 ## Como funciona
 
 - `src/api.js` carrega `channels`, `streams`, `countries`, `categories`, `logos` e `blocklist` de `https://iptv-org.github.io/api/`.
   - Remove canais NSFW, encerrados ou bloqueados (DMCA).
+  - Mostra os nomes de países e categorias em português (`src/labels.js`).
   - Ordena os streams de cada canal: primeiro HTTPS, sem headers especiais, sem geo-bloqueio.
 - `Player.jsx` usa hls.js (ou HLS nativo no Safari/iOS). Se um stream falhar ou não arrancar em 15 s, tenta o seguinte automaticamente.
-- Favoritos são guardados em `localStorage`.
+- Favoritos e canais vistos recentemente ficam guardados no browser.
 
 ## Limitações conhecidas
 
