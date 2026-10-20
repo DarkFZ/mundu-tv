@@ -1,12 +1,56 @@
 import { useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
-import { Airplay, Cast, ExternalLink, Loader2, Lock, RotateCcw, Star, X } from 'lucide-react'
+import { Airplay, Cast, ExternalLink, Gauge, Loader2, Lock, RotateCcw, Star, X } from 'lucide-react'
 import { playableStreams, streamUrl } from '../api.js'
 import { categoryName, labelName } from '../labels.js'
 import { Logo } from './ChannelRow.jsx'
 import { youtubeLiveUrl } from '../extra.js'
 import Guide from './Guide.jsx'
+import { initialBandwidthEstimate, isSlowConnection, setQualityPref, useNetwork } from '../network.js'
 import { castChannel, stopCasting, useCast } from '../cast.js'
+
+// Opções do hls.js. Com internet lenta: começa numa qualidade baixa, guarda mais
+// vídeo em memória (aguenta quebras de rede) e espera mais por cada segmento.
+function hlsConfig(slow) {
+  const wait = slow
+    ? { maxTimeToFirstByteMs: 20_000, maxLoadTimeMs: 60_000 }
+    : { maxTimeToFirstByteMs: 10_000, maxLoadTimeMs: 20_000 }
+  const retry = { maxNumRetry: slow ? 4 : 2, retryDelayMs: 1000, maxRetryDelayMs: 8000 }
+  return {
+    enableWorker: true,
+    lowLatencyMode: false,
+    startLevel: -1, // a primeira qualidade vem da estimativa abaixo
+    abrEwmaDefaultEstimate: initialBandwidthEstimate(),
+    testBandwidth: true,
+    capLevelToPlayerSize: true, // não descarrega 1080p para um ecrã pequeno
+    capLevelOnFPSDrop: true,
+    // Sobe de qualidade com cautela e desce depressa
+    abrBandWidthFactor: slow ? 0.7 : 0.9,
+    abrBandWidthUpFactor: slow ? 0.5 : 0.7,
+    maxBufferLength: slow ? 60 : 30,
+    maxMaxBufferLength: slow ? 120 : 60,
+    backBufferLength: 30,
+    liveSyncDurationCount: slow ? 4 : 3,
+    startFragPrefetch: true,
+    manifestLoadPolicy: { default: { ...wait, timeoutRetry: retry, errorRetry: retry } },
+    playlistLoadPolicy: { default: { ...wait, timeoutRetry: retry, errorRetry: retry } },
+    fragLoadPolicy: { default: { ...wait, timeoutRetry: retry, errorRetry: retry } },
+  }
+}
+
+// Limita a qualidade automática à altura máxima (0 = sem limite)
+function applyCap(hls, maxHeight) {
+  if (!hls?.levels?.length) return
+  if (!maxHeight) {
+    hls.autoLevelCapping = -1
+    return
+  }
+  let cap = 0
+  hls.levels.forEach((l, i) => {
+    if (l.height && l.height <= maxHeight) cap = i
+  })
+  hls.autoLevelCapping = cap
+}
 
 export default function Player(props) {
   if (props.channel.subscription) return <SubscriptionStage {...props} />
@@ -129,8 +173,16 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
   const hlsRef = useRef(null)
   const onPlayingRef = useRef(onPlaying)
   onPlayingRef.current = onPlaying
-  const streams = playableStreams(channel)
+  const net = useNetwork()
+  const netRef = useRef(net)
+  netRef.current = net
+  // Ordem fixa enquanto o canal está aberto (com internet lenta, os mais leves primeiro)
+  const [streams] = useState(() => playableStreams(channel))
   const [index, setIndex] = useState(0)
+  const [levels, setLevels] = useState([]) // alturas disponíveis no stream atual
+  const [level, setLevel] = useState(-1) // escolha manual (-1 = automática)
+  const [playingHeight, setPlayingHeight] = useState(0)
+  const [buffering, setBuffering] = useState(false)
   const [status, setStatus] = useState('loading') // loading | playing | failed
   // Formato do stream atual: HLS (.m3u8) ou MPEG-TS contínuo (ex.: /play/a02z)
   const [format, setFormat] = useState('hls')
@@ -215,8 +267,16 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
     }
     const onFirstPlay = () => onPlayingRef.current?.(channel.id)
 
-    // Se em 15s não arrancar, passa ao próximo stream
-    timeout = setTimeout(next, 15000)
+    // Se não arrancar a tempo, passa ao próximo stream. Com internet lenta espera
+    // mais, e cada segmento que chega conta como sinal de vida.
+    const patience = isSlowConnection() ? 30_000 : 15_000
+    const armTimeout = () => {
+      clearTimeout(timeout)
+      timeout = setTimeout(next, patience)
+    }
+    armTimeout()
+    setLevels([])
+    setPlayingHeight(0)
     video.addEventListener('playing', onPlaying)
     video.addEventListener('playing', onFirstPlay, { once: true })
 
@@ -231,7 +291,15 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         }
         ts = mpegts.createPlayer(
           { type: 'mpegts', isLive: true, url: new URL(streamUrl(stream), location.href).href },
-          { enableWorker: true, liveBufferLatencyChasing: true, lazyLoad: false }
+          {
+            enableWorker: true,
+            lazyLoad: false,
+            // Com internet lenta, não salta para a frente para apanhar o direto
+            // (isso esvazia o buffer e provoca mais paragens)
+            liveBufferLatencyChasing: !isSlowConnection(),
+            enableStashBuffer: true,
+            stashInitialSize: isSlowConnection() ? 512 * 1024 : 128 * 1024,
+          }
         )
         ts.attachMediaElement(video)
         ts.load()
@@ -245,11 +313,20 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         })
       })
     } else if (Hls.isSupported()) {
-      hls = new Hls({ enableWorker: true, lowLatencyMode: false })
+      hls = new Hls(hlsConfig(isSlowConnection()))
       hlsRef.current = hls
       hls.loadSource(streamUrl(stream))
       hls.attachMedia(video)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}))
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        applyCap(hls, netRef.current.maxHeight)
+        setLevels(hls.levels.map((l) => l.height || 0))
+        setLevel(-1)
+        video.play().catch(() => {})
+      })
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, d) => setPlayingHeight(hls.levels[d.level]?.height || 0))
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        if (!started) armTimeout()
+      })
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (!data.fatal) return
         clearTimeout(timeout)
@@ -268,8 +345,27 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
       }
     }
 
+    // Indicador de "a carregar" quando o vídeo pára à espera de dados
+    let waitTimer
+    const onWaiting = () => {
+      clearTimeout(waitTimer)
+      waitTimer = setTimeout(() => setBuffering(true), 1200)
+    }
+    const onResume = () => {
+      clearTimeout(waitTimer)
+      setBuffering(false)
+    }
+    video.addEventListener('waiting', onWaiting)
+    video.addEventListener('playing', onResume)
+    video.addEventListener('canplay', onResume)
+
     return () => {
       clearTimeout(timeout)
+      clearTimeout(waitTimer)
+      setBuffering(false)
+      video.removeEventListener('waiting', onWaiting)
+      video.removeEventListener('playing', onResume)
+      video.removeEventListener('canplay', onResume)
       video.removeEventListener('playing', onPlaying)
       video.removeEventListener('playing', onFirstPlay)
       video.onerror = null
@@ -288,8 +384,31 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id, index, format, reconnect])
 
+  // Mudou a ligação ou a preferência "Poupar dados": ajusta o limite da qualidade automática
+  useEffect(() => {
+    if (level === -1) applyCap(hlsRef.current, net.maxHeight)
+  }, [net.maxHeight, level])
+
+  const chooseQuality = (value) => {
+    const hls = hlsRef.current
+    if (value === 'poupar' || value === 'auto') {
+      setQualityPref(value)
+      setLevel(-1)
+      if (hls) hls.currentLevel = -1
+      return
+    }
+    // Qualidade fixa escolhida à mão (só para este canal)
+    const i = Number(value)
+    setLevel(i)
+    if (hls) {
+      hls.autoLevelCapping = -1
+      hls.currentLevel = i
+    }
+  }
+
   const stream = streams[index]
-  const meta = [channel.categories[0] && categoryName(channel.categories[0]), countryLabel, stream?.quality]
+  const shownQuality = playingHeight ? `${playingHeight}p` : stream?.quality
+  const meta = [channel.categories[0] && categoryName(channel.categories[0]), countryLabel, shownQuality]
     .filter(Boolean)
     .join(' · ')
 
@@ -304,6 +423,11 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
             <button className="btn btn-secondary" onClick={stopCasting}>
               Parar de projetar
             </button>
+          </div>
+        )}
+        {buffering && status === 'playing' && !onTv && (
+          <div className="buffer-badge" aria-live="polite">
+            <Loader2 size={14} className="spin" /> {net.slow ? 'Internet lenta, a carregar…' : 'A carregar…'}
           </div>
         )}
         {status === 'loading' && stream && (
@@ -384,8 +508,31 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
         </div>
       </div>
 
-      {(stream?.labels?.length > 0 || streams.length > 1 || castError) && (
+      {(stream?.labels?.length > 0 || streams.length > 1 || castError || levels.length > 1 || net.slow) && (
         <div className="stage-foot">
+          {(levels.length > 1 || net.slow || net.pref === 'poupar') && (
+            <label className="quality">
+              <Gauge size={14} strokeWidth={1.75} aria-hidden="true" />
+              <span className="sr-only">Qualidade</span>
+              <select
+                value={level >= 0 ? String(level) : net.pref}
+                onChange={(e) => chooseQuality(e.target.value)}
+                aria-label="Qualidade do vídeo"
+              >
+                <option value="auto">Automática{net.slow ? ' (internet lenta)' : ''}</option>
+                <option value="poupar">Poupar dados (até 360p)</option>
+                {levels
+                  .map((h, i) => ({ h, i }))
+                  .filter(({ h }) => h)
+                  .sort((a, b) => b.h - a.h)
+                  .map(({ h, i }) => (
+                    <option key={i} value={String(i)}>
+                      {h}p
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
           {streams.length > 1 && (
             <span className="num">
               Stream {Math.min(index + 1, streams.length)} de {streams.length}

@@ -1,7 +1,7 @@
 // Service worker do Mundu TV: guarda a "casca" da app para abrir depressa e sem rede.
 // Não toca nos streams, na API do iptv-org nem nos logótipos (pedidos de outros domínios):
 // um direto em cache ficava congelado.
-const CACHE = 'mundu-v4'
+const CACHE = 'mundu-v5'
 const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {

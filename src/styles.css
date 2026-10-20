@@ -742,6 +742,21 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
 .legal-foot a:hover { color: var(--text); }
 .screen-overlay a.btn { text-decoration: none; margin-top: 4px; }
 
+/* Internet lenta: aviso de carregamento e escolha de qualidade */
+.buffer-badge {
+  position: absolute; top: 12px; left: 12px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgb(0 0 0 / 0.7); color: var(--text); font-size: var(--fs-small);
+  pointer-events: none;
+}
+.quality { display: inline-flex; align-items: center; gap: 6px; color: var(--faint); }
+.quality select {
+  height: 28px; padding: 0 8px; border: 1px solid var(--control); border-radius: 999px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: var(--fs-small);
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
 /* Recomendados: uma faixa de canais por secção */
 .rec-sections { display: flex; flex-direction: column; gap: 28px; margin-top: 8px; }
 .rec-section h2 { font-size: var(--fs-section); line-height: 24px; font-weight: 600; margin-bottom: 10px; }

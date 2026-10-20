@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Download, Search, Sparkles, Star, Tv } from 'lucide-react'
 import { loadCatalog } from './api.js'
 import { LUSOPHONE, countryName } from './labels.js'
 import { useFavorites, useRecent } from './useStoredList.js'
-import Player from './components/Player.jsx'
 import ChannelRow, { Logo } from './components/ChannelRow.jsx'
 import Mark from './components/Mark.jsx'
 import Recommended from './components/Recommended.jsx'
@@ -11,6 +10,11 @@ import { recommendedSections } from './recommended.js'
 import InstallInvite from './components/InstallInvite.jsx'
 import { useInstall } from './useInstall.js'
 import { TAKEDOWN_URL } from './legal.js'
+import { isSlowConnection } from './network.js'
+
+// O player (com o hls.js) só é descarregado quando se abre um canal:
+// a lista aparece mais depressa com internet lenta
+const Player = lazy(() => import('./components/Player.jsx'))
 
 const PAGE = 40
 const MAX_TABS = 7
@@ -62,6 +66,13 @@ export default function App() {
       setInviteOpen(false)
     } else setInviteOpen(true)
   }
+
+  // Com boa internet, prepara o player em segundo plano para o primeiro canal abrir logo
+  useEffect(() => {
+    if (!data || isSlowConnection()) return
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500))
+    idle(() => import('./components/Player.jsx'))
+  }, [data])
 
   useEffect(() => {
     setError(null)
@@ -147,6 +158,15 @@ export default function App() {
       : `${plural(scoped.length, 'canal', 'canais')} na lista`
 
   const player = current && (
+    <Suspense
+      fallback={
+        <section className="stage-card">
+          <div className="screen screen-idle">
+            <p>A abrir o player…</p>
+          </div>
+        </section>
+      }
+    >
     <Player
       key={current.id}
       channel={current}
@@ -156,6 +176,7 @@ export default function App() {
       onToggleFav={() => toggle(current.id)}
       onPlaying={pushRecent}
     />
+    </Suspense>
   )
 
   const recentChannels = recent.map((id) => byId.get(id)).filter(Boolean)

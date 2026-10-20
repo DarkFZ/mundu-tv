@@ -51,12 +51,21 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 
 ## Como funciona
 
-- `src/api.js` carrega `channels`, `streams`, `countries`, `categories`, `logos` e `blocklist` de `https://iptv-org.github.io/api/`.
+- `api/catalog.js` (Vercel Function) descarrega `channels`, `streams`, `countries`, `categories`, `logos` e `blocklist` de `https://iptv-org.github.io/api/` e devolve só o que a app usa, já filtrado (`src/catalog-core.js`). A CDN guarda a resposta 6 h. São ~0,4 MB comprimidos em vez de ~2,4 MB (17,6 MB por descomprimir) que cada pessoa descarregava antes.
   - Remove canais NSFW, encerrados, bloqueados (DMCA) e os de `src/legal.js`.
   - Só aceita streams que cumprem as regras da secção "Legalidade".
-  - Mostra os nomes de países e categorias em português (`src/labels.js`).
+  - Não toca em vídeo: é só a lista de canais.
+- `src/api.js` usa esse catálogo e, se falhar (ex.: `npm run dev`, que não corre a pasta `api/`), monta-o no browser a partir do iptv-org. Mostra os nomes de países e categorias em português (`src/labels.js`).
 - `Player.jsx` usa hls.js (ou HLS nativo no Safari/iOS). Se um stream falhar ou não arrancar em 15 s, tenta o seguinte automaticamente.
 - Favoritos e canais vistos recentemente ficam guardados no browser.
+
+## Internet lenta
+
+- **Arranque leve:** o catálogo compacto (acima) e o player com o hls.js só são descarregados quando se abre um canal. A primeira página passa de ~245 KB para ~57 KB de JavaScript comprimido.
+- **Qualidade automática à medida da ligação** (`src/network.js`): o browser diz a velocidade estimada (Chrome/Android). Em 2G/3G ou abaixo de 1,5 Mbit/s a qualidade automática fica até 480p (240p em 2G); com "Poupar dados", até 360p. O hls.js começa pela estimativa da ligação, sobe com cautela, desce depressa e nunca descarrega mais do que o tamanho do ecrã.
+- **Mais tolerância:** com internet lenta guarda até 60 s de vídeo, espera mais por cada segmento e tenta outra vez antes de desistir; só passa ao stream seguinte ao fim de 30 s sem nada (15 s com boa internet), e cada segmento que chega conta como sinal de vida.
+- **Escolha à mão:** no rodapé do player há o seletor de qualidade (Automática, Poupar dados, ou uma resolução fixa). "Poupar dados" fica guardado no aparelho.
+- No iPhone/iPad o Safari usa o seu próprio HLS: a escolha de qualidade não aparece e a adaptação é a do Safari.
 
 ## Limitações conhecidas
 
