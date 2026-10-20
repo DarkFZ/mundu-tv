@@ -61,6 +61,16 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 
 Canais que não têm stream a funcionar no iptv-org mas transmitem em direto oficialmente no YouTube estão em `src/extra.js`, e aparecem primeiro no seu país. Hoje: **TCV**, pelo canal oficial da RTC (@rtc.caboverde). Tocam no leitor do YouTube e não podem ser gravados.
 
+## Projetar na TV
+
+O botão de projetar aparece no player quando há como enviar o canal para a TV (`src/cast.js`).
+
+- **Chromecast / Google TV / Android TV:** no Chrome (Android ou PC), pelo Google Cast. A TV vai buscar o stream sozinha; o telemóvel pausa e pode até bloquear o ecrã. Mudar de canal com a TV ligada envia logo o novo canal.
+- **AirPlay:** no Safari (iPhone, iPad, Mac), pelo seletor nativo. O botão só aparece se houver uma Apple TV ou TV compatível na rede.
+- Canais que passam pelo proxy funcionam na TV (o URL enviado é o do proxy, HTTPS).
+- Streams MPEG-TS contínuos e canais do YouTube não usam este botão (o leitor do YouTube tem o seu próprio).
+- Smart TVs sem Chromecast nem AirPlay (Miracast, "Smart View") só por espelhamento do ecrã, nas definições do telemóvel.
+
 ## Gravação
 
 O botão **● Gravar** no player guarda o programa que estás a ver.

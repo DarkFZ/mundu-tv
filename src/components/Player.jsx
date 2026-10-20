@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
-import { Circle, ExternalLink, Loader2, RotateCcw, Square, Star, X } from 'lucide-react'
+import { Airplay, Cast, Circle, ExternalLink, Loader2, RotateCcw, Square, Star, X } from 'lucide-react'
 import { playableStreams, streamUrl } from '../api.js'
 import { categoryName, labelName } from '../labels.js'
 import { Logo } from './ChannelRow.jsx'
 import { youtubeLiveUrl } from '../extra.js'
+import { castChannel, stopCasting, useCast } from '../cast.js'
 
 const MAX_BYTES = 2 * 1024 ** 3 // pára sozinho aos 2 GB para não esgotar a memória
 
@@ -124,10 +125,60 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
   const [format, setFormat] = useState('hls')
   const [reconnect, setReconnect] = useState(0) // nova ligação ao mesmo stream
   const [rec, setRec] = useState(null) // { seconds, bytes } para a interface
-  const [recError, setRecError] = useState(null)
+  const [recError, setRecError] = useState(null) // mensagem de erro no rodapé (gravar / projetar)
+  const cast = useCast(videoRef)
+  const onTv = cast.kind === 'cast' && cast.connectedTo
 
   // No iOS o HLS é nativo e não deixa ler os segmentos; MPEG-TS também não grava
   const canRecord = Hls.isSupported() && format === 'hls'
+  // O recetor da TV só toca HLS; MPEG-TS contínuo fica no telemóvel
+  const canCast = cast.available && format === 'hls' && status === 'playing'
+
+  const castedRef = useRef(null) // URL que está na TV, para não o enviar duas vezes
+  const projectToTv = async () => {
+    setRecError(null)
+    const stream = streams[index]
+    castedRef.current = streamUrl(stream)
+    try {
+      await castChannel({
+        kind: cast.kind,
+        video: videoRef.current,
+        url: streamUrl(stream),
+        title: channel.name,
+        logo: channel.logo,
+      })
+    } catch (e) {
+      castedRef.current = null
+      if (e === 'cancel' || e?.code === 'cancel') return // fechou o seletor de TVs
+      setRecError('Não foi possível projetar este canal na TV.')
+    }
+  }
+
+  // Enquanto o canal está na TV, o telemóvel não gasta dados a tocá-lo também
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (!onTv) {
+      if (status === 'playing') video.play().catch(() => {})
+      return
+    }
+    video.pause()
+    const keepPaused = () => video.pause()
+    video.addEventListener('playing', keepPaused)
+    return () => video.removeEventListener('playing', keepPaused)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onTv])
+
+  // Mudar de canal com a TV ligada: o novo canal vai logo para a TV
+  useEffect(() => {
+    if (!onTv) {
+      castedRef.current = null
+      return
+    }
+    const stream = streams[index]
+    if (format === 'hls' && stream && castedRef.current !== streamUrl(stream)) projectToTv()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id, index, format, onTv])
 
   // Termina a gravação e descarrega o ficheiro
   const stopRecording = useCallback(async () => {
@@ -305,7 +356,16 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
   return (
     <section className="stage-card" aria-label={`A ver ${channel.name}`}>
       <div className="screen">
-        <video ref={videoRef} controls playsInline autoPlay />
+        <video ref={videoRef} controls playsInline autoPlay x-webkit-airplay="allow" />
+        {onTv && (
+          <div className="screen-overlay">
+            <Cast size={22} strokeWidth={1.75} />
+            <strong>A ver na {cast.connectedTo}</strong>
+            <button className="btn btn-secondary" onClick={stopCasting}>
+              Parar de projetar
+            </button>
+          </div>
+        )}
         {rec && (
           <div className="rec-badge num" aria-live="polite">
             <span className="rec-dot" /> REC {formatTime(rec.seconds)} · {formatSize(rec.bytes)}
@@ -365,6 +425,27 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
               </>
             )}
           </button>
+          {cast.available && (
+            <button
+              className={`icon-btn ${onTv ? 'is-on' : ''}`}
+              onClick={onTv ? stopCasting : projectToTv}
+              disabled={!onTv && !canCast}
+              aria-label={onTv ? 'Parar de projetar' : 'Projetar na TV'}
+              title={
+                format !== 'hls'
+                  ? 'Este stream não pode ser projetado na TV'
+                  : status !== 'playing' && !onTv
+                    ? 'Espera que o canal comece a tocar'
+                    : undefined
+              }
+            >
+              {cast.kind === 'airplay' ? (
+                <Airplay size={18} strokeWidth={1.75} />
+              ) : (
+                <Cast size={18} strokeWidth={1.75} />
+              )}
+            </button>
+          )}
           <button
             className={`icon-btn ${isFav ? 'is-on' : ''}`}
             onClick={onToggleFav}

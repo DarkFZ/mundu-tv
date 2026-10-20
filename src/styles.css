@@ -370,6 +370,7 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
 }
 .icon-btn:hover { color: var(--text); background: var(--surface); }
 .icon-btn.is-on { color: var(--text); }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .row-fav { margin-right: 4px; }
 
 .more {
