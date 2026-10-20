@@ -741,3 +741,28 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
 .legal-foot a { color: var(--muted); }
 .legal-foot a:hover { color: var(--text); }
 .screen-overlay a.btn { text-decoration: none; margin-top: 4px; }
+
+/* Recomendados: uma faixa de canais por secção */
+.rec-sections { display: flex; flex-direction: column; gap: 28px; margin-top: 8px; }
+.rec-section h2 { font-size: var(--fs-section); line-height: 24px; font-weight: 600; margin-bottom: 10px; }
+.rec-rail {
+  list-style: none; margin: 0; padding: 0 0 6px;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 132px; gap: 10px;
+  overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain;
+}
+.rec-rail > li { scroll-snap-align: start; }
+.rec-tile {
+  width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 12px; border: 0; border-radius: var(--radius-screen);
+  background: var(--surface); color: var(--text); text-align: left; cursor: pointer;
+}
+.rec-tile:hover { box-shadow: inset 0 0 0 1px var(--raised); }
+.rec-tile.is-playing { box-shadow: inset 0 0 0 1px var(--accent); }
+.rec-tile .logo { margin-bottom: 6px; }
+.rec-name { width: 100%; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-meta { width: 100%; color: var(--faint); font-size: var(--fs-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-tile-skeleton { height: 128px; border-radius: var(--radius-screen); }
+.rec-section .sk-name { margin-bottom: 12px; }
+@media (max-width: 420px) {
+  .topbar-switch button { padding: 0 10px; }
+}
