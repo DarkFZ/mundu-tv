@@ -163,7 +163,7 @@ function YouTubeStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPl
       <div className="stage-foot">
         <span>{channel.source}.</span>
       </div>
-      <Guide channelId={channel.id} />
+      <Guide channelId={channel.id} channelName={channel.name} />
     </section>
   )
 }
@@ -550,7 +550,7 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
           )}
         </div>
       )}
-      <Guide channelId={channel.id} />
+      <Guide channelId={channel.id} channelName={channel.name} />
     </section>
   )
 }

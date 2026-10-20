@@ -1,11 +1,24 @@
-import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { CalendarDays, X } from 'lucide-react'
 import { dayLabel, hhmm, useGuide } from '../epg.js'
 
 // Programação do canal: o que está a dar, o que vem a seguir e a lista dos próximos dias
-export default function Guide({ channelId }) {
+export default function Guide({ channelId, channelName }) {
   const guide = useGuide(channelId)
   const [open, setOpen] = useState(false)
+  const dialogRef = useRef(null)
+
+  // Abre a janela como modal (o browser trata do foco, do Esc e do fundo)
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (open && !dialog.open) {
+      dialog.showModal()
+      // Leva a lista até ao programa que está a dar
+      dialog.querySelector('.is-now')?.scrollIntoView({ block: 'center' })
+    } else if (!open && dialog.open) dialog.close()
+  }, [open])
+
   if (!guide) return null
   const { now, current, next, upcoming } = guide
 
@@ -43,31 +56,46 @@ export default function Guide({ channelId }) {
         </p>
       )}
 
-      <button className="guide-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        {open ? 'Esconder a programação' : 'Ver a programação'}
-        <ChevronDown size={16} strokeWidth={1.75} className={open ? 'is-flipped' : ''} />
+      <button className="guide-toggle" onClick={() => setOpen(true)} aria-haspopup="dialog">
+        <CalendarDays size={16} strokeWidth={1.75} /> Ver a programação
       </button>
 
-      {open && (
-        <div className="guide-list">
-          {days.map((d) => (
-            <div key={d.label}>
-              <h3>{d.label}</h3>
-              <ol>
-                {d.items.map((p) => (
-                  <li key={p.s} className={p === current ? 'is-now' : ''}>
-                    <span className="num">{hhmm(p.s)}</span>
-                    <span>
-                      {p.t}
-                      {p.c && <small>{p.c}</small>}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+      <dialog
+        ref={dialogRef}
+        className="guide-dialog"
+        aria-labelledby="guide-dialog-title"
+        onClose={() => setOpen(false)}
+        onClick={(e) => e.target === e.currentTarget && setOpen(false)} // toque fora da janela
+      >
+        <div className="guide-dialog-body">
+          <header className="guide-dialog-head">
+            <h2 id="guide-dialog-title">Programação{channelName ? ` · ${channelName}` : ''}</h2>
+            <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Fechar a programação">
+              <X size={18} strokeWidth={1.75} />
+            </button>
+          </header>
+          {open && (
+            <div className="guide-list">
+              {days.map((d) => (
+                <div key={d.label}>
+                  <h3>{d.label}</h3>
+                  <ol>
+                    {d.items.map((p) => (
+                      <li key={p.s} className={p === current ? 'is-now' : ''}>
+                        <span className="num">{hhmm(p.s)}</span>
+                        <span>
+                          {p.t}
+                          {p.c && <small>{p.c}</small>}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </dialog>
     </section>
   )
 }

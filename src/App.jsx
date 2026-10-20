@@ -1,10 +1,12 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Download, Search, Star, Tv } from 'lucide-react'
+import { ChevronDown, Download, Search, Sparkles, Star, Tv } from 'lucide-react'
 import { loadCatalog } from './api.js'
 import { LUSOPHONE, countryName } from './labels.js'
 import { useFavorites, useRecent } from './useStoredList.js'
 import ChannelRow, { Logo } from './components/ChannelRow.jsx'
 import Mark from './components/Mark.jsx'
+import Recommended from './components/Recommended.jsx'
+import { recommendedSections } from './recommended.js'
 import InstallInvite from './components/InstallInvite.jsx'
 import { useInstall } from './useInstall.js'
 import { TAKEDOWN_URL } from './legal.js'
@@ -38,9 +40,10 @@ export default function App() {
   const [error, setError] = useState(null)
   const [attempt, setAttempt] = useState(0)
 
-  const [view, setView] = useState(() =>
-    new URLSearchParams(window.location.search).get('vista') === 'favoritos' ? 'favoritos' : 'canais'
-  ) // canais | favoritos
+  const [view, setView] = useState(() => {
+    const v = new URLSearchParams(window.location.search).get('vista')
+    return v === 'favoritos' || v === 'canais' ? v : 'recomendados'
+  }) // recomendados | canais | favoritos
   const [country, setCountry] = useState('CV') // '' = todos os países
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
@@ -82,6 +85,7 @@ export default function App() {
   }, [attempt])
 
   const byId = useMemo(() => new Map((data?.channels || []).map((c) => [c.id, c])), [data])
+  const recSections = useMemo(() => recommendedSections(byId), [byId])
   const countryById = useMemo(
     () => new Map((data?.countries || []).map((c) => [c.code, c.name])),
     [data]
@@ -141,11 +145,13 @@ export default function App() {
   }
 
   const title =
-    view === 'favoritos' ? 'Favoritos' : country ? countryById.get(country) || countryName(country) : 'Todos os países'
+    view === 'recomendados' ? 'Recomendados' : view === 'favoritos' ? 'Favoritos' : country ? countryById.get(country) || countryName(country) : 'Todos os países'
 
   const subline = !data
     ? 'A carregar a lista de canais abertos…'
-    : view === 'favoritos'
+    : view === 'recomendados'
+      ? 'Canais grátis e oficiais de desporto, animação, infantil e entretenimento'
+      : view === 'favoritos'
       ? scoped.length
         ? `${plural(scoped.length, 'canal guardado', 'canais guardados')} neste dispositivo`
         : 'Os canais que marcares com a estrela ficam aqui'
@@ -185,6 +191,12 @@ export default function App() {
         </div>
 
         <nav className="nav" aria-label="Secções">
+          <button
+            className={`nav-item ${view === 'recomendados' ? 'is-active' : ''}`}
+            onClick={() => setView('recomendados')}
+          >
+            <Sparkles size={16} strokeWidth={1.5} /> Recomendados
+          </button>
           <button
             className={`nav-item ${view === 'canais' ? 'is-active' : ''}`}
             onClick={() => setView('canais')}
@@ -255,9 +267,22 @@ export default function App() {
           <Search size={16} strokeWidth={1.75} aria-hidden="true" />
           <input
             type="search"
-            placeholder={view === 'favoritos' ? 'Procurar nos favoritos' : `Procurar em ${title}`}
+            placeholder={
+              view === 'favoritos'
+                ? 'Procurar nos favoritos'
+                : view === 'recomendados'
+                  ? 'Procurar canal'
+                  : `Procurar em ${title}`
+            }
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              // Procurar a partir dos recomendados procura em todos os canais
+              if (view === 'recomendados') {
+                setView('canais')
+                setCountry('')
+              }
+              setQuery(e.target.value)
+            }}
             aria-label="Procurar canal"
           />
         </label>
@@ -272,6 +297,14 @@ export default function App() {
           </button>
         )}
         <div className="topbar-switch" role="tablist" aria-label="Secções">
+          <button
+            role="tab"
+            aria-selected={view === 'recomendados'}
+            className={view === 'recomendados' ? 'is-active' : ''}
+            onClick={() => setView('recomendados')}
+          >
+            Recomendados
+          </button>
           <button
             role="tab"
             aria-selected={view === 'canais'}
@@ -330,6 +363,38 @@ export default function App() {
         </div>
 
         <div className="workspace">
+          {view === 'recomendados' ? (
+          <section className="list-block" aria-label="Canais recomendados">
+            {error ? (
+              <div className="block-message">
+                <p>Não foi possível carregar a lista de canais. Verifica a ligação à internet.</p>
+                <button className="text-btn" onClick={() => setAttempt((a) => a + 1)}>
+                  Tentar outra vez
+                </button>
+              </div>
+            ) : !data ? (
+              <div className="rec-sections" aria-busy="true">
+                {[1, 2].map((i) => (
+                  <div key={i} className="rec-section">
+                    <span className="skeleton sk-name" />
+                    <div className="rec-rail">
+                      {[1, 2, 3, 4].map((j) => (
+                        <span key={j} className="skeleton rec-tile-skeleton" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Recommended
+                sections={recSections}
+                countryById={countryById}
+                currentId={current?.id}
+                onPlay={play}
+              />
+            )}
+          </section>
+          ) : (
           <section className="list-block" aria-label="Lista de canais">
             {view === 'canais' && tabs.length > 1 && (
               <div className="tabs" role="tablist" aria-label="Categorias">
@@ -412,6 +477,7 @@ export default function App() {
               </>
             )}
           </section>
+          )}
 
           {isDesktop && (
           <aside className="stage stage-desk" aria-label="Player">
