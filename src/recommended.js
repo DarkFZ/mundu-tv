@@ -46,6 +46,21 @@ export const RECOMMENDED = [
     ],
   },
   {
+    // Canais oficiais e grátis da Nickelodeon na Pluto TV (os primeiros, em português)
+    id: 'nickelodeon',
+    title: 'Nickelodeon',
+    channels: [
+      'BobEsponjaCalcaQuadrada.us',
+      'NickelodeonClassico.us',
+      'AvatarAlendadeAang.us',
+      'NickelodeonPlutoTV.us',
+      'NickJrPlutoTV.us',
+      'NickelodeonToons.us',
+      'Rugrats.us',
+      'iCarly.us',
+    ],
+  },
+  {
     id: 'entretenimento',
     title: 'Entretenimento',
     channels: [
