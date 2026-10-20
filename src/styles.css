@@ -489,6 +489,24 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
   font-size: var(--fs-small);
   color: var(--faint);
 }
+/* Guia de programação: Agora / A seguir */
+.epg { display: grid; gap: 8px; padding: 12px 4px 2px; font-size: var(--fs-meta); }
+.epg-now { display: grid; gap: 6px; }
+.epg-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.epg-tag { flex: none; color: var(--faint); font-size: var(--fs-small); font-weight: 500; }
+.epg-tag-live { color: var(--accent); }
+.epg-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text); }
+.epg-time { flex: none; color: var(--faint); font-size: var(--fs-small); }
+.epg-time-lead { width: 92px; }
+.epg-bar { height: 3px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.epg-bar span { display: block; height: 100%; background: var(--accent); }
+.epg-desc { color: var(--muted); font-size: var(--fs-small); line-height: 18px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.epg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.epg-list .epg-title { color: var(--muted); }
+.epg-more { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--nav); font: inherit; font-size: var(--fs-small); cursor: pointer; }
+.epg-more:hover { color: var(--text); }
+.epg-more .flip { transform: rotate(180deg); }
+.epg-empty { padding: 12px 4px 2px; color: var(--faint); font-size: var(--fs-small); }
 .stage-error {
   padding: 0;
   border: 0;
@@ -633,6 +651,9 @@ h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 600; letter-spa
   .stage-phone .stage-actions .btn { height: 40px; padding: 0 14px; margin-right: 2px; }
   .stage-phone .icon-btn { width: 40px; height: 40px; }
   .stage-phone .stage-foot { padding: 0 var(--gutter) 6px; }
+  .stage-phone .epg { padding: 0 var(--gutter) 8px; gap: 6px; }
+  .stage-phone .epg-empty { padding: 0 var(--gutter) 6px; }
+  .stage-phone .epg-desc, .stage-phone .epg-more, .stage-phone .epg-list { display: none; }
 
   .row-main { height: 64px; }
   .icon-btn { width: 44px; height: 44px; }

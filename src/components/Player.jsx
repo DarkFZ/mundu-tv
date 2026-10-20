@@ -5,6 +5,7 @@ import { playableStreams } from '../api.js'
 import { categoryName, labelName } from '../labels.js'
 import { Logo } from './ChannelRow.jsx'
 import { youtubeLiveUrl } from '../extra.js'
+import NowNext from './NowNext.jsx'
 
 const MAX_BYTES = 2 * 1024 ** 3 // pára sozinho aos 2 GB para não esgotar a memória
 
@@ -103,6 +104,8 @@ function YouTubeStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPl
           </button>
         </div>
       </div>
+
+      <NowNext channelId={channel.id} />
 
       <div className="stage-foot">
         <span>{channel.source}. Este canal não pode ser gravado.</span>
@@ -345,6 +348,8 @@ function HlsStage({ channel, countryLabel, onClose, isFav, onToggleFav, onPlayin
           </button>
         </div>
       </div>
+
+      <NowNext channelId={channel.id} />
 
       {(stream?.labels?.length > 0 || streams.length > 1 || recError) && (
         <div className="stage-foot">
