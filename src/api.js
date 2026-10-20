@@ -8,7 +8,7 @@ export { isLegalStream } from './catalog-core.js'
 
 // VITE_API_BASE aponta para outra cópia da API do iptv-org (e salta o endpoint)
 const API_BASE = import.meta.env.VITE_API_BASE
-const CATALOG_URL = import.meta.env.VITE_CATALOG_URL || '/api/catalog'
+const CATALOG_URL = import.meta.env.VITE_CATALOG_URL || `/api/catalog/${import.meta.env.VITE_BUILD_ID}`
 
 // O URL que o player usa é sempre o original do canal
 export function streamUrl(s) {

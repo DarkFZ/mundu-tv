@@ -51,7 +51,7 @@ Ver `DESIGN.md`. As skills de design `impeccable` e `taste-skill` estão em `.cl
 
 ## Como funciona
 
-- `api/catalog.js` (Vercel Function) descarrega `channels`, `streams`, `countries`, `categories`, `logos` e `blocklist` de `https://iptv-org.github.io/api/` e devolve só o que a app usa, já filtrado (`src/catalog-core.js`). A CDN guarda a resposta 6 h. São ~0,4 MB comprimidos em vez de ~2,4 MB (17,6 MB por descomprimir) que cada pessoa descarregava antes.
+- `api/catalog/[version].js` (Vercel Function, em `/api/catalog/<commit>`) descarrega `channels`, `streams`, `countries`, `categories`, `logos` e `blocklist` de `https://iptv-org.github.io/api/` e devolve só o que a app usa, já filtrado (`src/catalog-core.js`). A CDN guarda a resposta 6 h. São ~0,4 MB comprimidos em vez de ~2,4 MB (17,6 MB por descomprimir) que cada pessoa descarregava antes.
   - Remove canais NSFW, encerrados, bloqueados (DMCA) e os de `src/legal.js`.
   - Só aceita streams que cumprem as regras da secção "Legalidade".
   - Não toca em vídeo: é só a lista de canais.
