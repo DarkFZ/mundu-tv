@@ -10,7 +10,7 @@ O Mundu TV é um guia, não um distribuidor. As regras estão em `src/api.js` (`
 - **Só streams diretos e abertos:** HTTPS, sem Referer/User-Agent falsificados e sem geo-bloqueio. Os streams que precisavam disto ficam de fora.
 - **Sem cópias de terceiros:** streams de servidores de pirataria, agregadores e plataformas de operadoras ficam de fora (`BLOCKED_HOSTS` em `src/legal.js`). Canais de marcas pagas (ESPN, Disney, Nickelodeon, Globo…) só entram se vierem de um serviço oficial gratuito, como Pluto TV ou Samsung TV Plus (`PAID_BRANDS` e `TRUSTED_HOSTS`). É uma lista mantida à mão: se aparecer um servidor novo de retransmissões, junta-o a `BLOCKED_HOSTS`.
 - **Respeita remoções:** a lista de bloqueio do iptv-org (pedidos DMCA) e os pedidos feitos ao Mundu TV, em `src/legal.js`.
-- **Canais pagos só como atalho:** SPORT TV e SporTV aparecem com o selo "Assinatura" e abrem o serviço oficial. Nunca se toca o sinal na app.
+- **Canais pagos só como atalho:** SPORT TV, SporTV e Cartoon Network aparecem com o selo "Assinatura" e abrem o serviço oficial. Nunca se toca o sinal na app.
 - **Sem gravação nem descargas.**
 
 ### Pedidos de remoção

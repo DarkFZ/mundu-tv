@@ -31,6 +31,18 @@ export const EXTRA_CHANNELS = [
     },
   },
   {
+    id: 'mundu.cartoonnetwork.br',
+    name: 'Cartoon Network',
+    country: 'BR',
+    categories: ['animation', 'kids'],
+    website: 'https://www.hbomax.com',
+    subscription: {
+      url: 'https://www.hbomax.com',
+      provider: 'HBO Max',
+      note: 'Canal pago. Os desenhos do Cartoon Network estão no HBO Max (Brasil e Portugal; ainda não em Cabo Verde) e nas operadoras de TV com o canal no pacote.',
+    },
+  },
+  {
     id: 'mundu.sportv.br',
     name: 'SporTV',
     country: 'BR',
